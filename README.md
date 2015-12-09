@@ -156,7 +156,6 @@ OR
 		
 		public function __construct(){
 		
-			//DISABLE THE HEADERS FOR THE PROFILE AND SETINGS VIEWS
 			$this->disable_headers(arrray('profile', 'settings'));
 		}
 		
@@ -173,4 +172,291 @@ OR
 			//do settings stuff here
 		}
 	}
+```
+
+## Models
+
+Models are representations of a database table. They can contain 1 or more rows of a database table
+
+#### Creating Models
+
+To create a model it needs to be named properly, live in the models directory, and be named just like the database table.
+
+If we have a table named **user** to create a model for it lets create a file in the **/model** folder named **User_Model.php**
+
+The code should look like this.
+```
+<?php
+	class User_Model extends zSpark_Model{
+		
+		public function __construct(){
+		
+		}
+	}
+```
+
+Now we can call the model and retrieve its data by using
+
+```
+	$this->load_model('User')->orm_load();
+```
+
+The above command will load every record in the **user** mysql table.
+
+
+#### But my table isnt named the same as my model
+
+Take a breath. Its okay. In the model construct we can use
+```
+	$this->_table_name = 'people';
+```
+
+Now when we use **$this->load_model('User')->orm_load();** it will use the mysql table **people**
+
+**Full Example**
+
+```
+<?php
+	class User_Model extends zSpark_Model{
+		
+		public function __construct(){
+			$this->_table_name = 'people';
+		}
+	}
+```
+
+## Working with the zSpark ORM
+
+The zSpark orm helps to load parts of the database quickly and navigate to their relationships
+
+#### zSpark ORM Methods
+
+There are a few methods for the zSpark ORM
+
+- orm_load
+- orm_set
+- orm_save
+- orm_delete
+- where
+- order
+- limit
+- has_many
+- has_one
+
+#### orm_load
+
+After after the model is loaded, orm_load tells zSpark to run the query. 
+
+There are 2 ways to use orm_load. The first is to supply no command like:
+```
+	$this->load_model('User')->orm_load();
+```
+
+The second is to supply a mysql id like:
+
+```
+	$this->load_model('User')->orm_load(1);
+```
+
+The first command will load every single record in the mysql table that the model is mapped to, and the second will only load the record where the mysql id is what was passed.
+
+#### orm_set
+
+This method allows us to set data to the model object.
+
+Lets say that we are trying to create a new user. We would do something like this.
+
+```
+$data = array(
+	'user_first_name' 	=> 'John',
+	'user_last_name		=> 'Doe',
+	'user_email'		=> 'example@domain.com'
+);
+
+$user = $this->load_model('User')->orm_set($data)->orm_save();
+```
+
+The above PHP will load the User model, set the data for that model and save it to the database. Now the new database record is contained in the **$user** variable.
+
+#### orm_save
+
+orm_save can either create or update a model's record in the database. Weather it creates or updates is dependent on weather the models data has an id in associated.
+
+If we wanted to update a model's record instead of creating a new one we could do something like this
+
+```
+$data = array(
+	'user_id'		=> 1,
+	'user_first_name' 	=> 'Jack',
+);
+
+$user = $this->load_model('User')->orm_set($data)->orm_save();
+```
+The above will update the **user_first_name** of the user record with a **user_id** of 1 to Jack
+
+OR if we want to update data for a specific model record we can use:
+
+```
+//load the model
+$user = $this->load_model('User')->orm_load(1);
+
+//create data for update
+$data = array('user_first_name' => 'Joe');
+
+//set and save the data
+$user->orm_set($data)->orm_save();
+
+//or if you want it on one line just use
+$user = $this->load_model('User')->orm_load(1)->orm_set($data)->orm_save();
+```
+
+#### orm_delete
+
+Although I generally dont like to actually delete records from the database but usually set up a field named delete with a true/false, sometimes it is necessary. To delete a record, load the model, load the record, use orm_delete
+
+```
+	$this->load_model('User')->orm_load(1)->orm_delete();
+```
+
+#### ORM: Where
+
+Often we will need to load many records with specific context from the database. For this we us **->where()**
+
+Lets say I want all users whose user_create_date value is after July 1st of 2016. I would use something like:
+
+```
+$users = $this->load_model('User')->where("user_create_date > 2016-07-01")->orm_load();
+```
+
+#### ORM: Order 
+
+Lets say that I want to order my results of an orm_load. By default zSpark loads everything by id ascending. We can overwrite that by using something like:
+
+```
+$users = $this->load_model('User')->order("user_create_date DESC")->orm_load();
+```
+
+#### ORM: LIMIT 
+
+Lets say that I want limit my results of an orm_load. I would use something like
+
+```
+$users = $this->load_model('User')->limit(5)->orm_load();
+```
+
+#### ORM: Combine ORM Methods
+
+You can combine and reuse any combination of ORM methods
+
+```
+$users = $this->load_model('User')->limit(5)->where("user_id > 200")->where("user_first_name = 'Jack' OR user_create_date > 2016-07-01")->order("user_create_date DESC")->orm_load();
+```
+### ORM Relationships
+
+Unlike the other ORM methods the relationships are set in the model.
+
+#### ORM: Has One
+
+Has one refers to a model being a parent of one other model.
+
+The has_one method take a few parameters. They are 
+```
+$this->has_one('model', 'local_field', 'remote_field', array('field_name' => 'field_value', 'field2_name' => 'field2_value'));
+```
+
+
+For example a User model may have one Profile model. To set this relatioship you would add this to the User_Model.php
+
+```
+$this->has_one('Profile');
+```
+
+However maybe the field name in the **user** table for profile is not the same as the profiles id. You can use something like this
+
+```
+$this->has_one('Profile', 'profile_id', 'id');
+```
+
+Sometimes we want to be able to specify adittional field to take into consideration. In this example lets map a profile that is active to a user
+
+```
+$this->has_one('Profile', 'profile_id', 'profile_id', array('profile_active' => 'true'));
+```
+
+Now we can call the profile from the user model by using something like this:
+
+```
+	$profile = $this->load_model('User')->orm_load(1)->profile();
+```
+
+**Full Example**
+
+```
+<?php
+	class User_Model extends zSpark_Model{
+		public function __construct(){
+			$this->has_one('Profile', 'profile_id', 'id', array('profile_active' => 'true'));
+		}
+		
+		public function get_profile(){
+			$profile = $this->profile();
+		}
+	}
+```
+
+#### Has Many
+
+**has_many** works EXACTLY like **has_one** but it load multiple objects. For example, a user may have multiple locations. You would use something like this
+
+```
+	//db mapping is identical
+	$this->has_many('Location');
+	
+	//db mapping is not identical
+	//user location id is 'location_id' and location tables id is 'id'
+	$this->has_many('Location', 'location_id', 'id');
+	
+	//db mapping needs extra params
+	$this->has_many('Location', 'location_id', 'location_id', array('city' => 'Sacramento', 'state' => 'CA'));
+```
+
+Once this relationship is set up it can be used like:
+
+```
+	//if this code is inside of the User_Model.php
+	$this->location();
+	
+	//this code is in the view
+	$user = $this->load_model('User')->orm_load(1);
+	$locations = $user->location();
+```
+
+
+#### Passing Parameters to relationships
+
+Sometimes we want to load a relationship, but only grab some of the relationship records and not all of them
+
+Lets say that we want a users friend, but we only want them in a specific city.
+
+The code would look like this
+```
+<?php
+	class User_Model extends zSpark_Model{
+	
+		public function __construct(){
+			$this->has_many('Friend');
+		}
+		
+		public function get_sacramento_friends(){
+			$friends = $this->location("friend_city = 'sacramento'");
+		}
+		
+		public function get_friends_by_state($state){
+			$friends = $this->location("friend_city = '{$state}'");
+		}
+		
+	
+	}
+	
+	
 ```
