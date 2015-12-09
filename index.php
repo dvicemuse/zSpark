@@ -323,7 +323,5 @@
 	}
 
 	//RUN THE INSTALLER
-	new zSpark_Installer();
-
-	
+	new zSpark_Installer();	
 ?>
