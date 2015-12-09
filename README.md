@@ -16,6 +16,42 @@ zSpark is a framework that has been under development for several years. It has 
 * Support for Libraries
 * Deploys with Bootstrap and jQuery
 
+##Table of Contents
+
+General
+* <a href="#installation">Installation</a>
+* <a href="#using-zspark">Using zSpark</a>
+	* <a href="#urls">URLs</a>
+
+	* <a href="#controllers">Controllers</a>
+		* <a href="#creating-controllers">Creating Controllers</a>
+
+	* <a href="#views">Views</a>
+		* <a href="#headers--footers">Headers and Footers</a>
+		* <a href="#disable-headers-and-footers">Disable Headers and Footers</a>
+
+	* <a href="#models">Models</a>
+		* <a href="#creating-models">Creating Models</a>
+
+	* <a href="#working-with-the-zspark-orm">zSpark ORM</a>
+		* <a href="#zspark-orm-methods">ORM Methods</a>  
+		* <a href="#orm_load">Load</a>
+		* <a href="#orm_load">Set</a>
+		* <a href="#orm_save">Save</a>
+		* <a href="#orm_delete">Delete</a>
+		* <a href="#orm-where">Where</a>
+		* <a href="#orm-order">Order</a>
+		* <a href="#orm-limit">Limit</a>
+		* <a href="#orm-combine-orm-methods">Combine Methods</a>
+
+		* <a href="#orm-relationships">ORM Relationships</a>  
+			* <a href="#orm-has-one">Has One</a>
+			* <a href="#has-many">Has Many</a>
+			* <a href="#passing-parameters-to-relationships">Pass Parameters to relationships</a>
+
+	* <a href="#plugins">Plugins</a>    
+	* <a href="#libraries">Libraries</a>  
+
 ## Installation
 
 1. Download the index.php file and place it in the server where you would like it to install. (i.e. /public_html/zSpark).
