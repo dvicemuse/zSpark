@@ -25,94 +25,14 @@
 			define('PLUGIN_PATH', 		APP_PATH.'plugin/'); 			//SET THE PATH FOR PLUGINS				
 			define('APP_NAME', 			basename(dirname(__FILE__))); 	//SET THE NAME OF THE APPLICATION - TAKE FROM THE FOLDER THE FRAMEWORK IS INSTALLED IN
 			define('VIEW_PATH', 		APP_PATH.'view/');				//SET THE PATH FOR VIEWS
+			define('LIB_PATH',			APP_PATH.'lib/');				//SET THE LIBRARY PATH
 
-			$this->show_installer();
-			
-		}
-
-		//BUILD FRAMEWORK FOLDER SCAFFOLDING
-		private function scaffold(){
-
-			//DEFINE FRAMEWORK SCAFFOLD DIRECTORIES
-			$directories = array(
-				MODEL_PATH,
-				CONTROLLER_PATH,
-				VIEW_PATH,
-				PLUGIN_PATH,
-				SYSTEM_PATH,
-			);
-
-			//CREATE THE DIRECTORIES
-			foreach($directories as $directory){
-				mkdir($directory, 0777, true);
-			}
-
-			$this->build_config_file();
-			$this->build_zSpark();
-			$this->build_controller_base();
-			$this->build_model_base();
-			$this->build_orm_wrapper();
-			$this->build_database();
-
-			//CREATE THE HTACCESS FILE
-			$this->htaccess();
-		
-			//CREATE THE HOME CONTROLLER
-			$this->home_controller();
-
-			//CREATE THE HOME TEMPLATE
-			$this->home_template();
-
-			//CREATE THE DEFAULT HEADER	
-			$this->header();
-
-			//CREATE HTE DEFAULT FOOTER
-			$this->footer();
-
-			//CREATE THE LOGIN CONTROLLER
-			$this->login_controller();
-
-			//CREATE THE LOGIN TEMPLATE
-			$this->login_template();
-
-			//CREATE SYSTEM TEMPLATE
-			$this->system_template();
-
-			//CREATE THE DEFAULT CSS
-			$this->css();	
-
-			//CREATE THE DEFAULT JAVASCRIPT
-			$this->javascript();
-
-			//CREATE THE ROUTE FILE
-			$this->build_router();
-
-
-			header('Location: ./');
-
-		}
-
-		private function build_router(){
-			$content = "<?php
-	
-	//LOAD zSpark
-	require_once 'system/zSpark.php';
-
-	//START zSpark AND TELL IT TO ROUTE THE REQUESTS
-	new zSpark(true);
-";
-			$this->create_file(APP_PATH.'index.php', $content);
-		}
-
-		private function show_installer(){
 			if(empty($_POST)){
 				$this->installer_template_welcome();
 			}
 			elseif($_POST['start_install']){
 				$this->validate_install();
-			}
-
-			//$this->scaffold();
+			}			
 		}
 
 		private function validate_install(){
@@ -134,1295 +54,186 @@
 				$this->installer_template_welcome($data);
 				exit;
 			}
-			else{
-				
-				$this->scaffold();
-				
-
-				
-
-			}
-		
-		}
-
-		private function build_zSpark(){
-
-			$content = '<?php
-	
-	session_start();
-
-	function pr($data){
-		echo \'<pre>\';
-		if(!$data){
-			var_dump($data);
-		}
-		else{
-			print_r($data);
-		}
-		echo \'</pre>\';
-	}
-
-	//PRIMARY FRAMEWORK CLASS
-	class zSpark {
-
-		//BEGIN PROGRAM
-		public function __construct($route = false){
-
-			//SET CONFIG
-			$this->config();
-
-			//SET REQUEST
-			$this->request();
-
-			//WAS ROUT SPECIFICALLY REQUESTED
-			if($route){
-
-				//ROUTE BASED ON THE URL REQUEST
-				$this->route();
-			}
-			
-		}
-
-		//SET CONFIG
-		public function config(){
-
-			if(!$this->config){
-				require_once dirname(__FILE__).\'/config.php\';
-				require_once dirname(__FILE__).\'/database.php\';
-				$this->config = new zSpark_Config;
-				require_once dirname(__FILE__).\'/model_base.php\';
-				require_once dirname(__FILE__).\'/orm_wrapper.php\';
-				require_once dirname(__FILE__).\'/controller_base.php\';				
-			}
-			return $this->config;
-		}
-
-		//LOAD THE DATABASE
-		public function Db($dbname = false){
-	
-			if(!$this->Db){
-				$Db 		= new zSpark_Database;
-				$dbconf 		= $this->config()->database();
-				if($dbname){
-					$dbconf 		= $this->config()->database($dbname);
-				}
-				$Db->dbname = $dbconf[\'db_name\'];				
-				$Db->conn = mysql_pconnect($dbconf[\'db_host\'], $dbconf[\'db_username\'], $dbconf[\'db_password\']) or trigger_error(mysql_error(),E_USER_ERROR);
-				mysql_select_db($dbconf[\'db_name\']);
-			}
-
-			//DB IS ALREADY CONNECTED
-			else{
-				if($this->Db->dbname !== $dbname){
-					$dbconf 		= $this->config()->database($dbname);
-					$Db->dbname 	= $dbconf[\'db_name\'];				
-					$Db->conn 		= mysql_pconnect($dbconf[\'db_host\'], $dbconf[\'db_username\'], $dbconf[\'db_password\']) or trigger_error(mysql_error(),E_USER_ERROR);
-					mysql_select_db($dbconf[\'db_name\']);
-				}
-			}
-
-			if(strpos(get_class($this), \'_Model\')){
-				return $Db;
-			}
-			$this->Db = $Db;
-			return $this->Db;
-		}
-
-		//GET REQUEST VARIABLES
-		public function request(){
-
-			//ONLY SET VARS IF THEY NEED TO BE SET
-			if(!$this->request){
-
-				//INIT VARS
-				$request_parts 		= explode(\'/\', $_SERVER[\'REQUEST_URI\']);
-				$filtered_parts 	= array();
-
-				//FILTER OUT EMPTY VALUES
-				foreach($request_parts as $part){
-					if($part !== \'\'){
-						$filtered_parts[] = $part;
-					}
-				}
-
-				$request_parts 		= $filtered_parts;
-				$beginning_found 	= false;
-				$request 			= new stdClass;
-				$request->raw 		= $request_parts;
-				
-				if(!in_array(APP_NAME, $request_parts)){
-					foreach($request_parts as $part){
-						//SET CONTROLLER
-						if(!isset($request->controller)){											
-							$request->controller = $part;
-							continue;
-						}
-
-						//SET METHOD/TEMPLATE
-						if(!isset($request->method)){
-							$request->method = $part;
-							continue;
-						}
-						
-						//SET GET VARS YOU CAN USE variable:value IN A PATH LIKE A $_GET VARIABLE
-						if(strpos($part, \':\')){
-							$sub_parts = explode(\':\', $part);
-							$request->vars[$sub_parts[0]] = $sub_parts[1];
-						}
-						else{
-							$request->vars[] = $part;
-						}
-					}
-				}
-				else{
-					//CYCLE THE REQUEST PARTS
-					foreach($request_parts as $part){
-						
-						//FIND THE APPLICATION IN THE PATH AND SKIP TO THE NEXT PART
-						if($part == APP_NAME){
-							$beginning_found = true;
-							continue;
-						}
-
-						//SKIP THE PART IF THE BEGINNING HASNT BEEN FOUND
-						if(!$beginning_found){
-							continue;
-						}
-
-						//SET CONTROLLER
-						if(!isset($request->controller)){											
-							$request->controller = $part;
-							continue;
-						}
-
-						//SET METHOD/TEMPLATE
-						if(!isset($request->method)){
-							$request->method = $part;
-							continue;
-						}
-						
-						//SET GET VARS YOU CAN USE variable:value IN A PATH LIKE A $_GET VARIABLE
-						if(strpos($part, \':\')){
-							$sub_parts = explode(\':\', $part);
-							$request->vars[$sub_parts[0]] = $sub_parts[1];
-						}
-						else{
-							$request->vars[] = $part;
-						}				
-					}
-				}
-				
-				//DEFAULT TO HOME CONTROLLER
-				if(!file_exists(CONTROLLER_PATH.$request->controller.\'_Controller.php\' && file_exists(VIEW_PATH.\'Home/\'.$request->controller.\'.php\'))){
-
-					//CHECK FOR VIEW PATH BEFORE SETTING CONTROLLER
-					if(!file_exists(VIEW_PATH.$request->controller)){
-						$request->method = $request->controller;
-						$request->controller = \'Home\';
-					}
-				}
-
-				$this->request = $request;
-			}
-
-			return $this->request;
-		}
-
-		//ROUTE REQUESTS
-		public function route(){
-
-			//DEFAULT TO HOME CONTROLLER
-			$controller_name 	= \'Home\';
-			$method 			= \'index\';	
-			
-			//IF A CONTROLLER NAME EXISTS
-			if($this->request()->controller){
-				$controller_name = $this->request()->controller;
-			}
-			
-			//LOAD THE CONTROLLER
-			$controller = $this->load_controller($controller_name);
-
-			//METHOD OVERRIDE
-			if($this->request()->method){
-				$method = $this->request()->method;
-			}
-
-			//FORWARD TO METHOD IF EXISTS
-			if(method_exists($controller, $method)){
-				$controller->$method();
-			}
-
-			//LOAD TEMPLATE
-			$controller->load_template();
-		}
-
-		public function load_controller($controller_name){
-
-			$this->request->controller = $controller_name;
-
-			//LOAD A CONTROLLER
-			$class_name = $controller_name.\'_Controller\';
-			
-			if(file_exists(CONTROLLER_PATH.$class_name.\'.php\')){
-				require_once CONTROLLER_PATH.$class_name.\'.php\';
-				return new $class_name;
-			}
-
-			//LOAD A FILE
-			else{
-
-				if($this->request->method){
-					$file_path = VIEW_PATH.$controller_name.\'/\'.$this->get_path_after($controller_name);
-
-					if(file_exists($file_path)){
-						ob_start();
-						include $file_path;
-						exit;
-					}					
-				}
-			}
-
-			//NO CONTROLLER OR FILE WAS LOADED TO BOMB OUT 404
-			$this->not_found();
-		}
-
-		public function load_model($name, $force_new = false){
-
-			/*if(class_exists($name) && $force_new == false){
-				return $this->$name;
-			}*/
-			$model_name = $name.\'_Model\';
-			$model_path = MODEL_PATH.$model_name.\'.php\';
-
-			require_once $model_path;
-			$this->$name = new $model_name;
-			return $this->$name;
-		}
-
-		public function load_plugin($name){
-
-
-
-			$plugin_path 	= PLUGIN_PATH.$name.\'/index.php\';
-			$class_name 	= $name.\'_Plugin\';
-
-			if(file_exists($plugin_path)){
-				require_once $plugin_path;				
-				return new $class_name;
-			}
-			$this->pr(\'Unable to load plugin \'. $name);
-			exit;
-		}
-
-		public function debug($data){
-			echo \'<pre>\';
-			if(!$data){
-				var_dump($data);
-			}
-			else{
-				print_r($data);
-			}
-			echo \'</pre>\';
-		}
-
-		public function load_lib($name){
-
-			$filepath = LIB_PATH.$name.\'.php\';
-			if(file_exists($filepath)){
-				require_once $filepath;
-			}
-
-		}
-
-		public function get_path_after($name){
-
-			//GET ALL THE URL PARTS
-			$request_parts = $this->request()->raw;			
-
-			//INIT PATH ARRAY
-			$path = array();
-
-			$found = false;
-
-			//CYCLE THE URL PARTS
-			foreach($request_parts as $part){
-
-				//THE PATH PART WAS FOUND
-				if($name == $part){
-					$found = true;
-					continue;
-				}
-
-				//PATH PART WAS ALREADY FOUND SO ADD THIS TO THE ARRAY
-				if($found){
-					$path[] = $part;
-				}
-			}			
-			return implode(\'/\', $path);
-		}
-
-		public function not_found(){
-
-			//SET THE HEADER AS 404
-			header("HTTP/1.0 404 Not Found");
-
-			//SET THE FILE PATH
-			$file_path = VIEW_PATH.\'System/404.php\';
-
-			//LOAD THE HEADER
-			$this->load_header();
-
-			//CHECK FOR 404 TEMPLATE
-			if(file_exists($file_path)){
-				include $file_path;
-			}
-
-			//NOT TEMPLATE FOUND JUST PRINT DEFAULT TEXT
-			else{
-				echo \'Error: 404. The page you are looking for was not found\';
-			}
-
-			//LOAD THE FOOTER
-			$this->load_footer();
-
-			//END THE SCRIPT
-			exit;
-		}
-	}
-';
-		$this->create_file(SYSTEM_PATH.'zSpark.php', $content);
-
-		}
-
-		private function build_database(){
-			$content = '<?php
-
-	class zSpark_Database{
-
-		public $conn;
-		public $q;
-		public $num_rows;
-		public $inserted_columns;
-	
-		function add_error($arr)
-		{
-			print_r($arr);
-		}
-		
-		function connect()
-		{
-			// Put the connection into $this->conn
-			$this->conn = mysql_connect($this->credentials[\'db_host\'], $this->credentials[\'db_username\'], $this->credentials[\'db_password\']);
-			mysql_select_db($this->credentials[\'db_name\'], $this->conn);
-		}
-
-		function query($query)
-		{
-			$this->q = NULL;
-			$this->num_rows = NULL;
-			$this->q = mysql_query($query, $this->conn);
-			if($this->q)
-			{
-				//$this->add_flash($query);
-				$ret = TRUE;
-			}else{
-				$this->add_error(array(0 => $query, 1 => mysql_error()));
-				$ret = FALSE;
-			}
-			return $ret;
-		}
-		
-		function get_row($query)
-		{
-			
-			// Perform the query
-			if(!$this->query($query))
-			{
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				return FALSE;
-			}else{
-				return $this->stripslashes_deep(mysql_fetch_assoc($this->q));
-			}
-		}
-
-		
-		function get_rows($query)
-		{
-			// Perform the query
-			if(!$this->query($query))
-			{
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				return FALSE;
-			}else{
-				while($r = mysql_fetch_assoc($this->q))
-				{
-					$ret[] = $this->stripslashes_deep($r);
-				}
-				return $ret;
-			}
-		}
-
-
-		
-		
-		
-		function insert($table, $data)
-		{
-			$this->inserted_columns = array();
-			// Perform the query
-			if(!$this->query("SHOW COLUMNS FROM `{$table}`"))
-			{
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				return FALSE;
-			}else{
-				while($r = mysql_fetch_assoc($this->q))
-				{
-					$fields[$r[\'Field\']] = array(
-						\'type\' => $r[\'Type\'],
-						\'key\' => $r[\'Key\'],
-					);
-				}
-				$data = $this->stripslashes_deep($data);
-				foreach($data as $k => $v)
-				{
-					if(is_array($fields[$k]))
-					{
-						$this->inserted_columns[$k] = $k;
-						$v = $this->escape($v);
-						$query .= " `{$k}` = \'{$v}\', ";
-					}
-				}
-				$query = trim($query, \' ,\');
-				$complete = "INSERT INTO `{$table}` SET {$query}";
-				if($this->query($complete))
-				{
-					return mysql_insert_id($this->conn);
-				}else{
-					return false;
-				}
-			}
-		}
-
-	
-		function update($table, $data, $where)
-		{
-			if(!strstr(\' \'.$where, \'=\'))
-			{
-				$this->add_error(\'No where clause specified. Exiting update.\');
-				return FALSE;
-			}
-			// Perform the query
-			if(!$this->query("SHOW COLUMNS FROM `{$table}`"))
-			{
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				return FALSE;
-			}else{
-				while($r = mysql_fetch_assoc($this->q))
-				{
-					$fields[$r[\'Field\']] = array(
-						\'type\' => $r[\'Type\'],
-						\'key\' => $r[\'Key\'],
-					);
-				}
-				$data = $this->stripslashes_deep($data);
-				foreach($data as $k => $v)
-				{
-					if(is_array($fields[$k]) && $fields[$k][\'key\'] != \'PRI\')
-					{
-						$v = $this->escape($v);
-						$query .= " `{$k}` = \'{$v}\', ";
-					}
-				}
-				$query = trim($query, \' ,\');
-				$complete = "UPDATE `{$table}` SET {$query} WHERE {$where}";
-				return $this->query($complete);
-			}
-		}
-
-		function num_rows()
-		{
-			return mysql_num_rows($this->q);
-		}
-
-
-
-		/**
-		 * Escape a string
-		 *
-		 * @param string $value
-		 * @return string results
-		 */
-		function escape($value)
-		{
-			if(is_array($value))
-			{
-				return mysql_real_escape_string(serialize($value), $this->conn);
-			}
-			return mysql_real_escape_string($value, $this->conn);
-		}
-
-		
-		/**
-		 * Recursively remove slash characters from an array or string
-		 *
-		 * @param array/string $value
-		 * @return array results
-		 */
-		function escape_deep($value)
-		{
-			if(is_array($value))
-			{
-				foreach($value as $k=>$v)
-				{
-					$value[$k] = $this->escape_deep($v);
-				}
-				return $value;
-			}else{
-				return mysql_real_escape_string($value, $this->conn);
-			}
-		}
-
-
-		/**
-		 * Recursively remove slash characters from an array or string
-		 *
-		 * @param array/string $value
-		 * @return array results
-		 */
-		function stripslashes_deep($value)
-		{
-			if(is_object($value)){
-				return $value;
-			}
-			if(is_array($value))
-			{
-				foreach($value as $k=>$v)
-				{
-					$value[$k] = $this->stripslashes_deep($v);
-				}
-				return $value;
-			}else{			
-				return stripslashes($value);
-			}
-		}
-
-
-
-		/**
-		 * Will pull a single result from table, joining
-		 * in any table with the appropriate naming prefix.
-		 * If there is a field in table named address_id, it
-		 * will look for a table named address, and then
-		 * join in the row with the value stored in that field.
-		 *
-		 * @param string $table
-		 * @param string $where
-		 * @return array results
-		 */
-		function fetch_complete($table, $where)
-		{
-			// Make sure there is a where clause
-			if(!strstr(\' \'.$where, \'=\'))
-			{
-				$this->add_error(\'No where clause specified. Exiting fetch_complete.\');
-				return FALSE;
-			}
-			// Fetch table names for later
-			if(!$this->get_table_names())
-			{
-				return FALSE;
-			}
-			// Perform the query
-			if(!$this->query("SHOW COLUMNS FROM `{$table}`"))
-			{
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				return FALSE;
-			}else{
-				while($r = mysql_fetch_assoc($this->q))
-				{
-					$fields[$r[\'Field\']] = array(
-						\'type\' => $r[\'Type\'],
-						\'key\' => $r[\'Key\'],
-					);
-				}
-
-				$complete = "SELECT * FROM {$table} WHERE {$where}";
-				$return = $this->get_row($complete);				
-
-				if($return !== FALSE)
-				{
-					$final_return = $return;
-					foreach($return as $key => $val)
-					{
-						if(preg_match(\'/([a-z_0-9]+)_id/i\', $key, $matches))
-						{
-							if($matches[1] != $table && array_search($matches[1], $this->tables) !== FALSE)
-							{
-								$get_join = $this->get_row("SELECT * FROM {$matches[1]} WHERE {$key} = \'{$val}\' ");
-								if($get_join !== FALSE)
-								{
-									$final_return = array_merge($final_return, $get_join);
-								}
-							}
-						}
-					}
-				}
-				return $final_return;
-
-			}
-		}
-
-
-
-		/**
-		 * Get all of the table names for the current database,
-		 * store the resulting array in $this->tables
-		 *
-		 * @return boolean success
-		 */
-		function get_table_names()
-		{
-			// Get all of the table names
-			if(!$this->query("SHOW TABLES"))
-			{
-				$this->add_error("Could not get table names.");
-				return FALSE;
-			}
-			// Get results from query
-			if(mysql_num_rows($this->q) == 0)
-			{
-				$this->add_error("Could not get table names.");
-				return FALSE;
-			}else{
-				while($r = mysql_fetch_array($this->q))
-				{
-					$this->tables[] = $r[0];
-				}
-				return TRUE;
-			}
-		}
-
-
-		// Get valid enum values from a column
-		// Borrowed from php.net
-		function get_enum($table, $field, $ucfirst_values = TRUE)
-		{
-			$result = $this->query("show columns from {$table}");
-			$types = array();
-			while($tuple=mysql_fetch_assoc($this->q))
-			{
-				if($tuple[\'Field\'] == $field)
-				{
-					$types=$tuple[\'Type\'];
-					$beginStr=strpos($types,"(")+1;
-					$endStr=strpos($types,")");
-					$types=substr($types,$beginStr,$endStr-$beginStr);
-					$types=str_replace("\'","",$types);
-					$types=split(\',\',$types);
-					if($sorted)
-					{
-						sort($types);
-					}
-				}
-			}
-			foreach($types as $v)
-			{
-				if($ucfirst_values)
-				{
-					$ret[$v] = ucfirst($v);
-				}else{
-					$ret[$v] = $v;	
-				}
-			}
-			return $ret;
-		}
-	}';
-
-			$this->create_file(SYSTEM_PATH.'database.php', $content);
-		}
-
-		private function build_orm_wrapper(){
-			$content = '<?php
-	//ORM WRAPPER BASE CLASS
-	class ORM_Wrapper extends zSpark_Model{
-
-		public function __construct(){
-			unset($this->request);
-		}
-
-		public function first(){
-			foreach($this as $el){
-				return $el;
-			}
-		}
-
-		public function count(){
-			$count = 0;
-			foreach($this as $el){
-				$count++;
-			}
-			return $count;
-		}
-
-		public function last(){
-			$count = $this->count()-1;
-			return $this->$count;
-		}
-	}
-';
-			$this->create_file(SYSTEM_PATH.'orm_wrapper.php', $content);
-		}
-
-		private function build_model_base(){
-			$content = '<?php 
-	
-	class zSpark_Model extends zSpark {
-
-		private $_has_many 	= array();
-		private $_has_one 	= array();
-		private $_where 	= array();
-		private $_order 	= array();
-		private $_limit;
-
-		public function __construct(){
-
-			//SET THE TABLE NAME
-			if(!$this->table_name){
-				$this->table_name = strtolower($this->model_name());
-			}
-		}
-
-		//FORWARD UNFOUND METHODS
-		public function __call($name, $value){
-
-			$class_name = str_replace(\'_Model\', \'\', get_class($this));
-			$check_var = strtolower($class_name).\'_\'.$name;
-			if(isset($this->$check_var)){
-				return $this->$check_var;
-			}
-			
-			//CHECK IF THIS MODEL HAS MANY
-			if(count($this->_has_many)){
-				foreach($this->_has_many as $get){
-					$get[\'table\'] = $this->get_table_name($get[\'model\']);
-					if(strtolower($name) == strtolower($get[\'table\']) || strtolower($name) == strtolower($get[\'model\'])){
-
-						$field_value 	= $this->$get[\'local_field\'];
-						$field_name 	= $get[\'remote_field\'];
-						$model 			= $this->load_model($get[\'model\'])->where("{$field_name} = \'{$field_value}\'");
-						if(!empty($value)){
-							$model->where($value[0]);
-						}
-
-						if(!empty($get[\'where\'])){
-							foreach($get[\'where\'] as $field_name => $field_value){
-								$model->where("{$field_name} = \'{$field_value}\'");
-							}
-						}
-
-						return $model->orm_load();
-					}
-				}
-			}
-
-			//CHECK IF THIS MODEL HAS ONE
-			if(count($this->_has_one)){
-				foreach($this->_has_one as $get){				
-					$get[\'table\'] = $this->get_table_name($get[\'model\']);
-					if(strtolower($name) == strtolower($get[\'table\']) || strtolower($name) == strtolower($get[\'model\'])){
-						
-						$field_value 	= $this->$get[\'local_field\'];
-						$field_name 	= $get[\'remote_field\'];						
-				
-						$model 			= $this->load_model($get[\'model\'])->where("{$field_name} = \'{$field_value}\'")->limit(1);
-						if(!empty($value)){
-							$model->where($value[0]);
-						}
-
-						if(!empty($get[\'where\'])){
-							foreach($get[\'where\'] as $field_name => $field_value){
-								$model->where("{$field_name} = \'{$field_value}\'");
-							}
-						}
-
-						$model = $model->orm_load();
-						//if($model->count()){
-						if(count($model)){
-							$model = $model[0];
-						}
-						return $model;
-					}
-				}
-			}			
-		}
-
-		public function where($query){
-			$this->_where[] = $query;			
-			return $this;
-		}
-
-		public function limit($number){
-			$this->_limit = $number;
-			return $this;
-		}
-
-		public function get_table_name($model_name){
-			$model = $this->load_model($model_name);
-
-			if($model->table_name){
-				$table_name = $model->table_name;
-			}
-			else{
-				$table_name = strtolower($model_name);
-			}
-
-			return $table_name;
-		}		
-
-		public function has_one($model_name, $local_field = null, $remote_field = null, $where = array()){
-
-			$default = strtolower($model_name).\'_id\';
-
-			//SET FIELDS IF NEEDED
-			if($local_field == false){
-				$local_field = $default;
-			}
-			if($remote_field == false){
-				$remote_field = $default;
-			}
-			
-			$this->_has_one[] = array(\'model\' => $model_name, \'local_field\' => $local_field, \'remote_field\' => $remote_field, \'where\' => $where);
-		}
-
-		//SET MODEL RELATIONSHIP TO MANY
-		public function has_many($model_name, $local_field = false, $remote_field = false, $where = array()){
-
-			$default = strtolower($model_name).\'_id\';			
-
-			//SET FIELDS IF NEEDED
-			if($local_field == false){
-				$local_field = $this->get_primary_field(strtolower($this->model_name()));
-			}
-
-			if($remote_field == false){
-				$remote_field = $this->get_primary_field(strtolower($this->model_name()));
-			}
-
-			$this->_has_many[] = array(\'model\' => $model_name, \'local_field\' => $local_field, \'remote_field\' => $remote_field, \'where\' => $where);
-		}
-
-		//GET THE NAME OF THIS MODEL
-		public function model_name(){
-
-			return str_replace(\'_Model\', \'\', get_class($this));
-		}
-
-		//GET THE PRIMARY KEY OF A TABLE
-		public function get_primary_field($table_name){
-
-			$field = $this->Db()->get_row("SHOW COLUMNS FROM `{$table_name}`");			
-			$field_name = $field[\'Field\'];		
-			return $field_name;
-		}
-
-		//LOAD A MODEL
-		public function orm_load($id = false){
-
-			if(!$this->table_name){
-				$this->table_name = strtolower($this->model_name());
-			}
-			
-			$field_name = $this->get_primary_field($this->table_name);
-			
-			
-			$where = " WHERE 1=1";
-			if($id){
-				$where .= "
-				AND ({$field_name} = {$id})";
-			}
-			if(count($this->_where)){
-				
-
-				foreach($this->_where as $q){
-					$where .= "
-						AND ({$q}) ";
-				}
-			}
-
-			$limit = "";
-			if($this->_limit){
-				$limit = " LIMIT {$this->_limit}";
-			}
-
-			$order = "ORDER BY {$field_name} ASC";
-			if($this->_order){
-				$order = $this->_order;
-			}
-
-
-			$sql = "SELECT * FROM `{$this->table_name}` {$where} {$order} {$limit} ";
-
-
-			
-			if($id === false){
-
-				$res = $this->Db()->get_rows($sql);
-				$ret = new Orm_Wrapper;
-				//$ret = array();
-				if($res){
-					foreach($res as $key=>$record){
-						$ret->$key = $this->orm_load($record[$field_name]);
-						//$ret[$key] = $this->orm_load($record[$field_name]);
-					}
-				}
-				return $ret;
-				
-			}
 			else{	
-				$model_name = $this->model_name().\'_Model\'; 
-				$model = new $model_name;			
-				$res = $model->Db()->get_row($sql);
-				$model->orm_set($res);
-				return $model;
-			}
-		}
-
-		public function orm_set($data = array()){
-			
-			foreach($data as $key=>$value){
-				$this->$key = $value;
-			}			
-			return $this;
-		}
-
-		public function orm_save(){
-			
-			//EXTRACT DATA
-			$data = $this->expose_data();
-			unset($data[\'table_name\']);
-			unset($data[\'_has_many\']);
-			unset($data[\'_has_one\']);
-			
-			//SET THE TABLE NAME
-			if(!$this->table_name){
-				$this->table_name = strtolower($this->model_name());
-			}
-
-			//GET THE PRIMARY FIELD
-			$primary_field = $this->get_primary_field($this->table_name);
-
-			//INSERT A NEW RECORD
-			if(!$data[$primary_field]){
-				$id = $this->Db()->insert($this->table_name, $data);
-			}
 
 
-			//UPDATE THE RECORD BECAUSE AN ID WAS PROVIDED
-			else{
-				
-				//CHECK THAT THE RECORD EXISTS
-				if($this->Db()->get_row("SELECT * FROM `{$this->table_name}` WHERE {$primary_field} = \'{$data[$primary_field]}\'")){
-					$this->Db()->update($this->table_name, $data, "{$primary_field} = \'{$data[$primary_field]}\'");
-					$id = $data[$primary_field];
-				}
-				
-				//CREATE A NEW RECORD
-				else{
-					$id = $this->Db()->insert($this->table_name, $data);
-				}
-			}
-		
-			return $this->orm_load($id);
+				//COMPILE THE CONFIG FOLDER
+				$this->build_config_file();
 
-		}
 
-		//DELETE A RECORD
-		public function orm_delete(){
 
-			//EXTRACT DATA
-			$data = $this->expose_data();
+				//CREATE THE FILES
+				$this->build_files();
 
-			//GET THE PRIMARY FIELD
-			$primary_field = $this->get_primary_field($this->table_name);
-
-			//DELETE THE RECORD
-			return $this->Db()->query("DELETE FROM `{$this->table_name}` WHERE {$primary_field} = \'{$data[$primary_field]}\'");
-
-		}
-
-		public function expose_data(){
-			return get_object_vars($this); 
-		}
-	}
-';
-			$this->create_file(SYSTEM_PATH.'model_base.php', $content);
-		}
-
-		private function build_controller_base(){
-			$content = '<?php
-	
-	class zSpark_Controller extends zSpark{
-
-		private $_disable_headers = array();
-
-		//FIND THE URL PATH AFTER A URL PART
-		public function Db($name = false){
-			return $this->Db($name);
-		}
-		
-		public function require_login(){			
-			if(!isset($_SESSION[\'Login\'])){
-				$_SESSION[\'login_redirect\'] = $this->request->raw;
-				$this->load_controller(\'Login\')->load_template();
-				exit;
-			}
-		}
-
-		public function disable_headers($data){
-
-			if(is_array($data)){
-				foreach($data as $header){
-					$this->_disable_headers[] = $header;
-				}
-			}
-			else{
-				$this->_disable_headers[] = $data;
-			}
-		}
-
-		public function js_tag($name){			
-			echo \'<script type="text/javascript" src="\'.$this->config()->path->web_path.\'js/\'.$name.\'.js"></script>\';
-		}
-
-		public function css_tag($name){			
-			echo \'<link rel="stylesheet" href="\'.$this->config()->path->web_path.\'css/\'.$name.\'.css">\';
-		}
-
-		public function load_template($template = false, $load_controller = false){
-
-			
-
-			if(strpos(get_class($this), \'_Controller\')){
-				$controller = str_replace(\'_Controller\', \'\', get_class($this));
-			}
-			else{
-				$controller = \'Home\';
-				if($this->request()->controller){
-					$controller = $this->request()->controller;
-				}
-			}
-			
-
-			//NO TEMPLATE WAS SPECIFIED
-			if($template == false){
-				
-				//DEFAULT TO INDEX TEMPLATE
-				$template_path = VIEW_PATH.$controller.\'/index.php\';
-				
-				//IF THERE WAS A METHOD IN THE REQUEST SWITCH TO THAT TEMPLATE
-				if($this->request()->method){
-					$template_path = VIEW_PATH.$controller.\'/\'.$this->request()->method.\'.php\';
-				}
-			}
-
-			//A TEMPLATE WAS SPECIFIED
-			else{
-				$template_path = VIEW_PATH.$controller.\'/\'.$template.\'.php\';
-			}
-
-			//CHECK THAT THE TEMPLATE EXISTS
-			if(file_exists($template_path)){
-				
-				//GET THE HEADER
-				$this->load_header();
-
-				//GET THE TEMPLATE
-				include $template_path;
-
-				//GET THE FOOTER
-				$this->load_footer();
-				exit;
-			}
-
-			//BOMB OUT ERROR
-			else{
-				echo \'404 not found\';
-				exit;
-			}
-			exit;
-		}
-
-		public function load_header(){
-
-			//SET HEADER LOCATIONS
-			$main_header 	= VIEW_PATH.\'/header.php\';
-			$local_header 	= VIEW_PATH.$this->request()->controller.\'/header.php\';
-
-			//DEFAULT TO LOCAL HEADER
-			if(file_exists($local_header)){
-				include $local_header;
-			}
-
-			//LOAD MAIN HEADER
-			elseif(file_exists($main_header)){
-				include $main_header;
-			}
-		}
-
-		public function load_footer(){
-
-			$main_footer 	= VIEW_PATH.\'/footer.php\';
-			$local_footer 	= VIEW_PATH.$this->request()->controller.\'/footer.php\';
-
-			//DEFAULT TO LOCAL FOOTER
-			if(file_exists($local_footer)){
-				include $local_footer;
-			}
-
-			//LOAD MAIN FOOTER
-			elseif(file_exists($main_footer)){
-				include $main_footer;
-			}
-		}
-
-		public function load_partial($name){
-
-			$main_partial 	= VIEW_PATH.\'partial/\'.$name.\'.php\';
-			$local_partial 	= VIEW_PATH.$this->request()->controller.\'/partial/\'.$name.\'.php\';
-
-			//DEFAULT TO LOCAL FOOTER
-			if(file_exists($local_partial)){
-				include $local_partial;
-			}
-
-			//LOAD MAIN FOOTER
-			elseif(file_exists($main_partial)){
-				include $main_partial;
-			}
-		}
-	}
-			';
-
-			$this->create_file(SYSTEM_PATH.'controller_base.php', $content);
+				header('Location: ./');
+			}		
 		}
 
 		private function build_config_file(){
+				$credentials = '
+			$credentials = array(
+				\'db_name\' => array(
+					\'db_host\'		=> \'localhost\',				//do not touch unless you know how to connect to outside databases
+					\'db_username\' 	=> \'root\',				//your database username. If using wamp/mamp/lamp username is root
+					\'db_password\' 	=> \'\',				//your database password. If using wamp/mamp/lamp password is empty
+				),				
+			);
+			';
+				if($_POST['use_db'] == 'on'){
+						$credentials = '
+			$credentials = array(
+				\''.$_POST['db_name'].'\' => array(
+					\'db_host\'		=> \''.$_POST['db_host'].'\',				//do not touch unless you know how to connect to outside databases
+					\'db_username\' 	=> \''.$_POST['db_user'].'\',				//your database username. If using wamp/mamp/lamp username is root
+					\'db_password\' 	=> \''.$_POST['db_password'].'\',				//your database password. If using wamp/mamp/lamp password is empty
+				),				
+			);';
+				}
 
-			$credentials = '
-$credentials = array(
-	\'db_name\' => array(
-		\'db_host\'		=> \'localhost\',				//do not touch unless you know how to connect to outside databases
-		\'db_username\' 	=> \'root\',				//your database username. If using wamp/mamp/lamp username is root
-		\'db_password\' 	=> \'\',				//your database password. If using wamp/mamp/lamp password is empty
-	),				
-);
-';
-		if($_POST['use_db'] == 'on'){
-			$credentials = '
-$credentials = array(
-	\''.$_POST['db_name'].'\' => array(
-		\'db_host\'		=> \''.$_POST['db_host'].'\',				//do not touch unless you know how to connect to outside databases
-		\'db_username\' 	=> \''.$_POST['db_user'].'\',				//your database username. If using wamp/mamp/lamp username is root
-		\'db_password\' 	=> \''.$_POST['db_password'].'\',				//your database password. If using wamp/mamp/lamp password is empty
-	),				
-);
-';			
-		}
-
+			//BUILD CONFIG PARTS
+			$config_open 	= base64_decode('PD9waHANCmNsYXNzIHpTcGFya19Db25maWcgZXh0ZW5kcyB6U3Bhcmt7DQoNCglwdWJsaWMgZnVuY3Rpb24gX19jb25zdHJ1Y3QoKXsNCg0KCQkkdGhpcy0+ZGVmaW5lKCk7CQkJDQoJCSR0aGlzLT5wYXRoKCk7DQoJfQ0KDQoJLy9NQUlOIENPTkZJRw0KCXB1YmxpYyBmdW5jdGlvbiBwYXRoKCl7DQoNCgkJaWYoISR0aGlzLT5wYXRoKXsNCg0KCQkvL0RFRklORSBHTE9CQUwgVkFSIEhFUkUsIE5FU1QgTVVMVElESU1FTlNJT05BTCBBUlJBWVMgVE8gQ1JFQVRFIE9CSkVDVCBPUklFTlRFRCBTVFJVQ1RVUkUNCgkJJHBhdGggPSBhcnJheSgNCgkJCSd3ZWJfcGF0aCcJPT4gJy8vei1zcGFyay5jb20vJywgCS8veW91ciB3ZWJzaXRlIG5hbWUNCgkJCSdhcHBfbmFtZScJPT4gJycsIAkJLy9leGFtcGxlOiBkYXNoYm9hcmQNCgkJCSdwYXRobmFtZScgCT0+ICcveW91ci9wYXRoL2V4YW1wbGUvJywJCS8vZGVmaW5lIGEgY3VzdG9tIHBhdGggd2l0aCBhIGN1c3RvbSBuYW1lLiBCZXN0IHByYWN0aWNlIGlzIHRvIGJlZ2luIHdpdGggQVBQX1BBVEggdGhlbiBmb2xsb3cgd2l0aCB0aGUgZm9sZGVycyB0byBlbnN1cmUgYWNjdXJhY3kNCgkJCSd2YXJuYW1lJwk9PiBhcnJheSgNCgkJCQknc3VidmFyJyA9PiAnc3VidmFyX3ZhbHVlJwkJCQkvL2RlZmluZSBhcnJheShzKSB0byB1c2UgYXMgJHRoaXMtPnBhdGgtPnZhcm5hbWUtPnN1YnZhcl92YWx1ZSB0byBlc3RhYmxpc2ggY3VzdG9tIGdsb2JhbCB2YXJzLiBZb3UgY2FuIG5lc3QgYXMgbWFueSB2YXJzIGFzIHlvdSB3YW50DQoJCQkpLA0KCQkpOw0KDQoJCS8vQ09OVkVSVFMgQVJSQVkgVE8gT0JKRUNUDQoJCQkkdGhpcy0+cGF0aCA9IGpzb25fZGVjb2RlKGpzb25fZW5jb2RlKCRwYXRoKSk7DQoJCX0NCgkJcmV0dXJuICR0aGlzLT5wYXRoOw0KCX0NCg0KCXB1YmxpYyBmdW5jdGlvbiBkYXRhYmFzZSgkZGJfbmFtZSA9IGZhbHNlKXsNCg0KCQkvL1lPVVIgREFUQUJBU0UgQ1JFREVOVElBTFMuICR0aGlzLT5EYigpIFdJTEwgREVGQVVMVCBUTyBUSEUgRklSU1QgU0VUIE9GIENSRURFTlRJQUxTDQoJCS8vVE8gU1dJVENIIERBVEFCQVNFUzogVVNFICR0aGlzLT5EYihkYl9uYW1lKSA=');
+			$config_close 	= base64_decode('Ly9TV0lUQ0ggREIgQ1JFRCBJRiBORUVERUQNCgkJCWlmKCRkYl9uYW1lICE9PSBmYWxzZSl7DQoJCQkJcmV0dXJuICRjcmVkZW50aWFsc1skZGJfbmFtZV07DQoJCQl9DQoNCgkJCS8vREVGQVVMVCBUTyBGSVJTVCBDUkVERU5USUFMIFNFVA0KCQkJZm9yZWFjaCgkY3JlZGVudGlhbHMgYXMgJGRiX25hbWU9PiRjcmVkKXsNCgkJCQkkY3JlZFsnZGJfbmFtZSddID0gJGRiX25hbWU7DQoJCQkJcmV0dXJuICRjcmVkOw0KCQkJfQ0KCQl9DQoNCgkJLy9ERUZJTkUgRlJBTUVXT1JLIFZBUklBQkxFUw0KCQlwdWJsaWMgZnVuY3Rpb24gZGVmaW5lKCl7DQoJCQkNCgkJCS8vSUYgR0xPQkFMIERFRklOSVRJT05TIEFSRSBOT1QgREVGSU5FRA0KCQkJaWYoIWRlZmluZWQoJ0FQUF9QQVRIJykpew0KCQkJCQ0KCQkJCS8vQ09SRSBQQVRIUw0KCQkJCWRlZmluZSgnQVBQX1BBVEgnLCAJCQknL2hvbWUzL2RpZ2l0NDQ5L3B1YmxpY19odG1sL2Z3LycpOwkJCS8vU0VUIFRIRSBQQVRIIEZPUiBUSEUgTUFJTiBBUFBMSUNBVElPTg0KCQkJCWRlZmluZSgnTU9ERUxfUEFUSCcsIAkJQVBQX1BBVEguJ21vZGVsLycpOwkJCQkvL1NFVCBUSEUgUEFUSCBGT1IgTU9ERUxTDQoJCQkJZGVmaW5lKCdDT05UUk9MTEVSX1BBVEgnLCAJQVBQX1BBVEguJ2NvbnRyb2xsZXIvJyk7CQkJLy9TRVQgVEhFIFBBVEggRk9SIENPTlRST0xMRVJTDQoJCQkJZGVmaW5lKCdQTFVHSU5fUEFUSCcsIAkJQVBQX1BBVEguJ3BsdWdpbi8nKTsJCQkJLy9TRVQgVEhFIFBBVEggRk9SIFBMVUdJTlMJCQkJDQoJCQkJZGVmaW5lKCdBUFBfTkFNRScsIAkJCSdmdycpOyAJLy9TRVQgVEhFIE5BTUUgT0YgVEhFIEFQUExJQ0FUSU9OIC0gVEFLRSBGUk9NIFRIRSBGT0xERVIgVEhFIEZSQU1FV09SSyBJUyBJTlNUQUxMRUQgSU4NCgkJCQlkZWZpbmUoJ1ZJRVdfUEFUSCcsIAkJQVBQX1BBVEguJ3ZpZXcvJyk7CQkJCS8vU0VUIFRIRSBQQVRIIEZPUiBWSUVXUw0KCQkJfQ0KCQl9DQoJfQ==');	
+			$content		= $config_open.$credentials.$config_close;	
 			
-			$content = '
-<?php
-class zSpark_Config extends zSpark{
-
-	public function __construct(){
-
-		$this->define();			
-		$this->path();
-	}
-
-	//MAIN CONFIG
-	public function path(){
-
-		if(!$this->path){
-
-		//DEFINE GLOBAL VAR HERE, NEST MULTIDIMENSIONAL ARRAYS TO CREATE OBJECT ORIENTED STRUCTURE
-		$path = array(
-			\'web_path\'	=> \'//'.$_SERVER['HTTP_HOST'].$_SERVER['REQUEST_URI'].'\', 	//your website name
-			\'app_name\'	=> \'\', 		//example: dashboard
-			\'pathname\' 	=> \'/your/path/example/\',		//define a custom path with a custom name. Best practice is to begin with APP_PATH then follow with the folders to ensure accuracy
-			\'varname\'	=> array(
-				\'subvar\' => \'subvar_value\'				//define array(s) to use as $this->path->varname->subvar_value to establish custom global vars. You can nest as many vars as you want
-			),
-		);
-
-		//CONVERTS ARRAY TO OBJECT
-			$this->path = json_decode(json_encode($path));
-		}
-		return $this->path;
-	}
-
-	public function database($db_name = false){
-
-		//YOUR DATABASE CREDENTIALS. $this->Db() WILL DEFAULT TO THE FIRST SET OF CREDENTIALS
-		//TO SWITCH DATABASES: USE $this->Db(db_name) 
-		'.$credentials.'
-
-			//SWITCH DB CRED IF NEEDED
-			if($db_name !== false){
-				return $credentials[$db_name];
-			}
-
-			//DEFAULT TO FIRST CREDENTIAL SET
-			foreach($credentials as $db_name=>$cred){
-				$cred[\'db_name\'] = $db_name;
-				return $cred;
-			}
-		}
-
-		//DEFINE FRAMEWORK VARIABLES
-		public function define(){
-			
-			//IF GLOBAL DEFINITIONS ARE NOT DEFINED
-			if(!defined(\'APP_PATH\')){
-				
-				//CORE PATHS
-				define(\'APP_PATH\', 			\''.APP_PATH.'\');			//SET THE PATH FOR THE MAIN APPLICATION
-				define(\'MODEL_PATH\', 		APP_PATH.\'model/\');				//SET THE PATH FOR MODELS
-				define(\'CONTROLLER_PATH\', 	APP_PATH.\'controller/\');			//SET THE PATH FOR CONTROLLERS
-				define(\'PLUGIN_PATH\', 		APP_PATH.\'plugin/\');				//SET THE PATH FOR PLUGINS				
-				define(\'APP_NAME\', 			\''.basename(APP_PATH).'\'); 	//SET THE NAME OF THE APPLICATION - TAKE FROM THE FOLDER THE FRAMEWORK IS INSTALLED IN
-				define(\'VIEW_PATH\', 		APP_PATH.\'view/\');				//SET THE PATH FOR VIEWS
-			}
-		}
-	}';
+			//SAVE THE FILE
 			$this->create_file(SYSTEM_PATH.'config.php', $content);
 		}
 
-		
+		private function build_files(){
+			
+			//SET THE INSTALL FILE CONTENT
+			$files = array(
 
+				//SYSTEM FILES
+				'system' 		=> array(
+					SYSTEM_PATH.'zSpark.php' 				=> 'PD9waHANCgkNCglzZXNzaW9uX3N0YXJ0KCk7DQoNCglmdW5jdGlvbiBwcigkZGF0YSl7DQoJCWVjaG8gJzxwcmU+JzsNCgkJaWYoISRkYXRhKXsNCgkJCXZhcl9kdW1wKCRkYXRhKTsNCgkJfQ0KCQllbHNlew0KCQkJcHJpbnRfcigkZGF0YSk7DQoJCX0NCgkJZWNobyAnPC9wcmU+JzsNCgl9DQoNCgkvL1BSSU1BUlkgRlJBTUVXT1JLIENMQVNTDQoJY2xhc3MgelNwYXJrIHsNCg0KCQkvL0JFR0lOIFBST0dSQU0NCgkJcHVibGljIGZ1bmN0aW9uIF9fY29uc3RydWN0KCRyb3V0ZSA9IGZhbHNlKXsNCg0KCQkJLy9TRVQgQ09ORklHDQoJCQkkdGhpcy0+Y29uZmlnKCk7DQoNCgkJCS8vU0VUIFJFUVVFU1QNCgkJCSR0aGlzLT5yZXF1ZXN0KCk7DQoNCgkJCS8vV0FTIFJPVVQgU1BFQ0lGSUNBTExZIFJFUVVFU1RFRA0KCQkJaWYoJHJvdXRlKXsNCg0KCQkJCS8vUk9VVEUgQkFTRUQgT04gVEhFIFVSTCBSRVFVRVNUDQoJCQkJJHRoaXMtPnJvdXRlKCk7DQoJCQl9DQoJCQkNCgkJfQ0KDQoJCS8vU0VUIENPTkZJRw0KCQlwdWJsaWMgZnVuY3Rpb24gY29uZmlnKCl7DQoNCgkJCWlmKCEkdGhpcy0+Y29uZmlnKXsNCgkJCQlyZXF1aXJlX29uY2UgZGlybmFtZShfX0ZJTEVfXykuJy9jb25maWcucGhwJzsNCgkJCQlyZXF1aXJlX29uY2UgZGlybmFtZShfX0ZJTEVfXykuJy9kYXRhYmFzZS5waHAnOw0KCQkJCSR0aGlzLT5jb25maWcgPSBuZXcgelNwYXJrX0NvbmZpZzsNCgkJCQlyZXF1aXJlX29uY2UgZGlybmFtZShfX0ZJTEVfXykuJy9tb2RlbF9iYXNlLnBocCc7DQoJCQkJcmVxdWlyZV9vbmNlIGRpcm5hbWUoX19GSUxFX18pLicvb3JtX3dyYXBwZXIucGhwJzsNCgkJCQlyZXF1aXJlX29uY2UgZGlybmFtZShfX0ZJTEVfXykuJy9jb250cm9sbGVyX2Jhc2UucGhwJzsJCQkJDQoJCQl9DQoJCQlyZXR1cm4gJHRoaXMtPmNvbmZpZzsNCgkJfQ0KDQoJCS8vTE9BRCBUSEUgREFUQUJBU0UNCgkJcHVibGljIGZ1bmN0aW9uIERiKCRkYm5hbWUgPSBmYWxzZSl7DQoJDQoJCQlpZighJHRoaXMtPkRiKXsNCgkJCQkkRGIgCQk9IG5ldyB6U3BhcmtfRGF0YWJhc2U7DQoJCQkJJGRiY29uZiAJCT0gJHRoaXMtPmNvbmZpZygpLT5kYXRhYmFzZSgpOw0KCQkJCWlmKCRkYm5hbWUpew0KCQkJCQkkZGJjb25mIAkJPSAkdGhpcy0+Y29uZmlnKCktPmRhdGFiYXNlKCRkYm5hbWUpOw0KCQkJCX0NCgkJCQkkRGItPmRibmFtZSA9ICRkYmNvbmZbJ2RiX25hbWUnXTsJCQkJDQoJCQkJJERiLT5jb25uID0gbXlzcWxfcGNvbm5lY3QoJGRiY29uZlsnZGJfaG9zdCddLCAkZGJjb25mWydkYl91c2VybmFtZSddLCAkZGJjb25mWydkYl9wYXNzd29yZCddKSBvciB0cmlnZ2VyX2Vycm9yKG15c3FsX2Vycm9yKCksRV9VU0VSX0VSUk9SKTsNCgkJCQlteXNxbF9zZWxlY3RfZGIoJGRiY29uZlsnZGJfbmFtZSddKTsNCgkJCX0NCg0KCQkJLy9EQiBJUyBBTFJFQURZIENPTk5FQ1RFRA0KCQkJZWxzZXsNCgkJCQlpZigkdGhpcy0+RGItPmRibmFtZSAhPT0gJGRibmFtZSl7DQoJCQkJCSRkYmNvbmYgCQk9ICR0aGlzLT5jb25maWcoKS0+ZGF0YWJhc2UoJGRibmFtZSk7DQoJCQkJCSREYi0+ZGJuYW1lIAk9ICRkYmNvbmZbJ2RiX25hbWUnXTsJCQkJDQoJCQkJCSREYi0+Y29ubiAJCT0gbXlzcWxfcGNvbm5lY3QoJGRiY29uZlsnZGJfaG9zdCddLCAkZGJjb25mWydkYl91c2VybmFtZSddLCAkZGJjb25mWydkYl9wYXNzd29yZCddKSBvciB0cmlnZ2VyX2Vycm9yKG15c3FsX2Vycm9yKCksRV9VU0VSX0VSUk9SKTsNCgkJCQkJbXlzcWxfc2VsZWN0X2RiKCRkYmNvbmZbJ2RiX25hbWUnXSk7DQoJCQkJfQ0KCQkJfQ0KDQoJCQlpZihzdHJwb3MoZ2V0X2NsYXNzKCR0aGlzKSwgJ19Nb2RlbCcpKXsNCgkJCQlyZXR1cm4gJERiOw0KCQkJfQ0KCQkJJHRoaXMtPkRiID0gJERiOw0KCQkJcmV0dXJuICR0aGlzLT5EYjsNCgkJfQ0KDQoJCS8vR0VUIFJFUVVFU1QgVkFSSUFCTEVTDQoJCXB1YmxpYyBmdW5jdGlvbiByZXF1ZXN0KCl7DQoNCgkJCS8vT05MWSBTRVQgVkFSUyBJRiBUSEVZIE5FRUQgVE8gQkUgU0VUDQoJCQlpZighJHRoaXMtPnJlcXVlc3Qpew0KDQoJCQkJLy9JTklUIFZBUlMNCgkJCQkkcmVxdWVzdF9wYXJ0cyAJCT0gZXhwbG9kZSgnLycsICRfU0VSVkVSWydSRVFVRVNUX1VSSSddKTsNCgkJCQkkZmlsdGVyZWRfcGFydHMgCT0gYXJyYXkoKTsNCg0KCQkJCS8vRklMVEVSIE9VVCBFTVBUWSBWQUxVRVMNCgkJCQlmb3JlYWNoKCRyZXF1ZXN0X3BhcnRzIGFzICRwYXJ0KXsNCgkJCQkJaWYoJHBhcnQgIT09ICcnKXsNCgkJCQkJCSRmaWx0ZXJlZF9wYXJ0c1tdID0gJHBhcnQ7DQoJCQkJCX0NCgkJCQl9DQoNCgkJCQkkcmVxdWVzdF9wYXJ0cyAJCT0gJGZpbHRlcmVkX3BhcnRzOw0KCQkJCSRiZWdpbm5pbmdfZm91bmQgCT0gZmFsc2U7DQoJCQkJJHJlcXVlc3QgCQkJPSBuZXcgc3RkQ2xhc3M7DQoJCQkJJHJlcXVlc3QtPnJhdyAJCT0gJHJlcXVlc3RfcGFydHM7DQoJCQkJDQoJCQkJaWYoIWluX2FycmF5KEFQUF9OQU1FLCAkcmVxdWVzdF9wYXJ0cykpew0KCQkJCQlmb3JlYWNoKCRyZXF1ZXN0X3BhcnRzIGFzICRwYXJ0KXsNCgkJCQkJCS8vU0VUIENPTlRST0xMRVINCgkJCQkJCWlmKCFpc3NldCgkcmVxdWVzdC0+Y29udHJvbGxlcikpewkJCQkJCQkJCQkJDQoJCQkJCQkJJHJlcXVlc3QtPmNvbnRyb2xsZXIgPSAkcGFydDsNCgkJCQkJCQljb250aW51ZTsNCgkJCQkJCX0NCg0KCQkJCQkJLy9TRVQgTUVUSE9EL1RFTVBMQVRFDQoJCQkJCQlpZighaXNzZXQoJHJlcXVlc3QtPm1ldGhvZCkpew0KCQkJCQkJCSRyZXF1ZXN0LT5tZXRob2QgPSAkcGFydDsNCgkJCQkJCQljb250aW51ZTsNCgkJCQkJCX0NCgkJCQkJCQ0KCQkJCQkJLy9TRVQgR0VUIFZBUlMgWU9VIENBTiBVU0UgdmFyaWFibGU6dmFsdWUgSU4gQSBQQVRIIExJS0UgQSAkX0dFVCBWQVJJQUJMRQ0KCQkJCQkJaWYoc3RycG9zKCRwYXJ0LCAnOicpKXsNCgkJCQkJCQkkc3ViX3BhcnRzID0gZXhwbG9kZSgnOicsICRwYXJ0KTsNCgkJCQkJCQkkcmVxdWVzdC0+dmFyc1skc3ViX3BhcnRzWzBdXSA9ICRzdWJfcGFydHNbMV07DQoJCQkJCQl9DQoJCQkJCQllbHNlew0KCQkJCQkJCSRyZXF1ZXN0LT52YXJzW10gPSAkcGFydDsNCgkJCQkJCX0NCgkJCQkJfQ0KCQkJCX0NCgkJCQllbHNlew0KCQkJCQkvL0NZQ0xFIFRIRSBSRVFVRVNUIFBBUlRTDQoJCQkJCWZvcmVhY2goJHJlcXVlc3RfcGFydHMgYXMgJHBhcnQpew0KCQkJCQkJDQoJCQkJCQkvL0ZJTkQgVEhFIEFQUExJQ0FUSU9OIElOIFRIRSBQQVRIIEFORCBTS0lQIFRPIFRIRSBORVhUIFBBUlQNCgkJCQkJCWlmKCRwYXJ0ID09IEFQUF9OQU1FKXsNCgkJCQkJCQkkYmVnaW5uaW5nX2ZvdW5kID0gdHJ1ZTsNCgkJCQkJCQljb250aW51ZTsNCgkJCQkJCX0NCg0KCQkJCQkJLy9TS0lQIFRIRSBQQVJUIElGIFRIRSBCRUdJTk5JTkcgSEFTTlQgQkVFTiBGT1VORA0KCQkJCQkJaWYoISRiZWdpbm5pbmdfZm91bmQpew0KCQkJCQkJCWNvbnRpbnVlOw0KCQkJCQkJfQ0KDQoJCQkJCQkvL1NFVCBDT05UUk9MTEVSDQoJCQkJCQlpZighaXNzZXQoJHJlcXVlc3QtPmNvbnRyb2xsZXIpKXsJCQkJCQkJCQkJCQ0KCQkJCQkJCSRyZXF1ZXN0LT5jb250cm9sbGVyID0gJHBhcnQ7DQoJCQkJCQkJY29udGludWU7DQoJCQkJCQl9DQoNCgkJCQkJCS8vU0VUIE1FVEhPRC9URU1QTEFURQ0KCQkJCQkJaWYoIWlzc2V0KCRyZXF1ZXN0LT5tZXRob2QpKXsNCgkJCQkJCQkkcmVxdWVzdC0+bWV0aG9kID0gJHBhcnQ7DQoJCQkJCQkJY29udGludWU7DQoJCQkJCQl9DQoJCQkJCQkNCgkJCQkJCS8vU0VUIEdFVCBWQVJTIFlPVSBDQU4gVVNFIHZhcmlhYmxlOnZhbHVlIElOIEEgUEFUSCBMSUtFIEEgJF9HRVQgVkFSSUFCTEUNCgkJCQkJCWlmKHN0cnBvcygkcGFydCwgJzonKSl7DQoJCQkJCQkJJHN1Yl9wYXJ0cyA9IGV4cGxvZGUoJzonLCAkcGFydCk7DQoJCQkJCQkJJHJlcXVlc3QtPnZhcnNbJHN1Yl9wYXJ0c1swXV0gPSAkc3ViX3BhcnRzWzFdOw0KCQkJCQkJfQ0KCQkJCQkJZWxzZXsNCgkJCQkJCQkkcmVxdWVzdC0+dmFyc1tdID0gJHBhcnQ7DQoJCQkJCQl9CQkJCQ0KCQkJCQl9DQoJCQkJfQ0KCQkJCQ0KCQkJCS8vREVGQVVMVCBUTyBIT01FIENPTlRST0xMRVINCgkJCQlpZighZmlsZV9leGlzdHMoQ09OVFJPTExFUl9QQVRILiRyZXF1ZXN0LT5jb250cm9sbGVyLidfQ29udHJvbGxlci5waHAnICYmIGZpbGVfZXhpc3RzKFZJRVdfUEFUSC4nSG9tZS8nLiRyZXF1ZXN0LT5jb250cm9sbGVyLicucGhwJykpKXsNCg0KCQkJCQkvL0NIRUNLIEZPUiBWSUVXIFBBVEggQkVGT1JFIFNFVFRJTkcgQ09OVFJPTExFUg0KCQkJCQlpZighZmlsZV9leGlzdHMoVklFV19QQVRILiRyZXF1ZXN0LT5jb250cm9sbGVyKSl7DQoJCQkJCQkkcmVxdWVzdC0+bWV0aG9kID0gJHJlcXVlc3QtPmNvbnRyb2xsZXI7DQoJCQkJCQkkcmVxdWVzdC0+Y29udHJvbGxlciA9ICdIb21lJzsNCgkJCQkJfQ0KCQkJCX0NCg0KCQkJCSR0aGlzLT5yZXF1ZXN0ID0gJHJlcXVlc3Q7DQoJCQl9DQoNCgkJCXJldHVybiAkdGhpcy0+cmVxdWVzdDsNCgkJfQ0KDQoJCS8vUk9VVEUgUkVRVUVTVFMNCgkJcHVibGljIGZ1bmN0aW9uIHJvdXRlKCl7DQoNCgkJCS8vREVGQVVMVCBUTyBIT01FIENPTlRST0xMRVINCgkJCSRjb250cm9sbGVyX25hbWUgCT0gJ0hvbWUnOw0KCQkJJG1ldGhvZCAJCQk9ICdpbmRleCc7CQ0KCQkJDQoJCQkvL0lGIEEgQ09OVFJPTExFUiBOQU1FIEVYSVNUUw0KCQkJaWYoJHRoaXMtPnJlcXVlc3QoKS0+Y29udHJvbGxlcil7DQoJCQkJJGNvbnRyb2xsZXJfbmFtZSA9ICR0aGlzLT5yZXF1ZXN0KCktPmNvbnRyb2xsZXI7DQoJCQl9DQoJCQkNCgkJCS8vTE9BRCBUSEUgQ09OVFJPTExFUg0KCQkJJGNvbnRyb2xsZXIgPSAkdGhpcy0+bG9hZF9jb250cm9sbGVyKCRjb250cm9sbGVyX25hbWUpOw0KDQoJCQkvL01FVEhPRCBPVkVSUklERQ0KCQkJaWYoJHRoaXMtPnJlcXVlc3QoKS0+bWV0aG9kKXsNCgkJCQkkbWV0aG9kID0gJHRoaXMtPnJlcXVlc3QoKS0+bWV0aG9kOw0KCQkJfQ0KDQoJCQkvL0ZPUldBUkQgVE8gTUVUSE9EIElGIEVYSVNUUw0KCQkJaWYobWV0aG9kX2V4aXN0cygkY29udHJvbGxlciwgJG1ldGhvZCkpew0KCQkJCSRjb250cm9sbGVyLT4kbWV0aG9kKCk7DQoJCQl9DQoNCgkJCS8vTE9BRCBURU1QTEFURQ0KCQkJJGNvbnRyb2xsZXItPmxvYWRfdGVtcGxhdGUoKTsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBsb2FkX2NvbnRyb2xsZXIoJGNvbnRyb2xsZXJfbmFtZSl7DQoNCgkJCSR0aGlzLT5yZXF1ZXN0LT5jb250cm9sbGVyID0gJGNvbnRyb2xsZXJfbmFtZTsNCg0KCQkJLy9MT0FEIEEgQ09OVFJPTExFUg0KCQkJJGNsYXNzX25hbWUgPSAkY29udHJvbGxlcl9uYW1lLidfQ29udHJvbGxlcic7DQoJCQkNCgkJCWlmKGZpbGVfZXhpc3RzKENPTlRST0xMRVJfUEFUSC4kY2xhc3NfbmFtZS4nLnBocCcpKXsNCgkJCQlyZXF1aXJlX29uY2UgQ09OVFJPTExFUl9QQVRILiRjbGFzc19uYW1lLicucGhwJzsNCgkJCQlyZXR1cm4gbmV3ICRjbGFzc19uYW1lOw0KCQkJfQ0KDQoJCQkvL0xPQUQgQSBGSUxFDQoJCQllbHNlew0KDQoJCQkJaWYoJHRoaXMtPnJlcXVlc3QtPm1ldGhvZCl7DQoJCQkJCSRmaWxlX3BhdGggPSBWSUVXX1BBVEguJGNvbnRyb2xsZXJfbmFtZS4nLycuJHRoaXMtPmdldF9wYXRoX2FmdGVyKCRjb250cm9sbGVyX25hbWUpOw0KDQoJCQkJCWlmKGZpbGVfZXhpc3RzKCRmaWxlX3BhdGgpKXsNCgkJCQkJCW9iX3N0YXJ0KCk7DQoJCQkJCQlpbmNsdWRlICRmaWxlX3BhdGg7DQoJCQkJCQlleGl0Ow0KCQkJCQl9CQkJCQkNCgkJCQl9DQoJCQl9DQoNCgkJCS8vTk8gQ09OVFJPTExFUiBPUiBGSUxFIFdBUyBMT0FERUQgVE8gQk9NQiBPVVQgNDA0DQoJCQkkdGhpcy0+bm90X2ZvdW5kKCk7DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gbG9hZF9tb2RlbCgkbmFtZSwgJGZvcmNlX25ldyA9IGZhbHNlKXsNCg0KCQkJLyppZihjbGFzc19leGlzdHMoJG5hbWUpICYmICRmb3JjZV9uZXcgPT0gZmFsc2Upew0KCQkJCXJldHVybiAkdGhpcy0+JG5hbWU7DQoJCQl9Ki8NCgkJCSRtb2RlbF9uYW1lID0gJG5hbWUuJ19Nb2RlbCc7DQoJCQkkbW9kZWxfcGF0aCA9IE1PREVMX1BBVEguJG1vZGVsX25hbWUuJy5waHAnOw0KDQoJCQlyZXF1aXJlX29uY2UgJG1vZGVsX3BhdGg7DQoJCQkkdGhpcy0+JG5hbWUgPSBuZXcgJG1vZGVsX25hbWU7DQoJCQlyZXR1cm4gJHRoaXMtPiRuYW1lOw0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIGxvYWRfcGx1Z2luKCRuYW1lKXsNCg0KDQoNCgkJCSRwbHVnaW5fcGF0aCAJPSBQTFVHSU5fUEFUSC4kbmFtZS4nL2luZGV4LnBocCc7DQoJCQkkY2xhc3NfbmFtZSAJPSAkbmFtZS4nX1BsdWdpbic7DQoNCgkJCWlmKGZpbGVfZXhpc3RzKCRwbHVnaW5fcGF0aCkpew0KCQkJCXJlcXVpcmVfb25jZSAkcGx1Z2luX3BhdGg7CQkJCQ0KCQkJCXJldHVybiBuZXcgJGNsYXNzX25hbWU7DQoJCQl9DQoJCQkkdGhpcy0+cHIoJ1VuYWJsZSB0byBsb2FkIHBsdWdpbiAnLiAkbmFtZSk7DQoJCQlleGl0Ow0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIGRlYnVnKCRkYXRhKXsNCgkJCWVjaG8gJzxwcmU+JzsNCgkJCWlmKCEkZGF0YSl7DQoJCQkJdmFyX2R1bXAoJGRhdGEpOw0KCQkJfQ0KCQkJZWxzZXsNCgkJCQlwcmludF9yKCRkYXRhKTsNCgkJCX0NCgkJCWVjaG8gJzwvcHJlPic7DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gbG9hZF9saWIoJG5hbWUpew0KDQoJCQkkZmlsZXBhdGggPSBMSUJfUEFUSC4kbmFtZS4nLnBocCc7DQoJCQlpZihmaWxlX2V4aXN0cygkZmlsZXBhdGgpKXsNCgkJCQlyZXF1aXJlX29uY2UgJGZpbGVwYXRoOw0KCQkJfQ0KDQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gZ2V0X3BhdGhfYWZ0ZXIoJG5hbWUpew0KDQoJCQkvL0dFVCBBTEwgVEhFIFVSTCBQQVJUUw0KCQkJJHJlcXVlc3RfcGFydHMgPSAkdGhpcy0+cmVxdWVzdCgpLT5yYXc7CQkJDQoNCgkJCS8vSU5JVCBQQVRIIEFSUkFZDQoJCQkkcGF0aCA9IGFycmF5KCk7DQoNCgkJCSRmb3VuZCA9IGZhbHNlOw0KDQoJCQkvL0NZQ0xFIFRIRSBVUkwgUEFSVFMNCgkJCWZvcmVhY2goJHJlcXVlc3RfcGFydHMgYXMgJHBhcnQpew0KDQoJCQkJLy9USEUgUEFUSCBQQVJUIFdBUyBGT1VORA0KCQkJCWlmKCRuYW1lID09ICRwYXJ0KXsNCgkJCQkJJGZvdW5kID0gdHJ1ZTsNCgkJCQkJY29udGludWU7DQoJCQkJfQ0KDQoJCQkJLy9QQVRIIFBBUlQgV0FTIEFMUkVBRFkgRk9VTkQgU08gQUREIFRISVMgVE8gVEhFIEFSUkFZDQoJCQkJaWYoJGZvdW5kKXsNCgkJCQkJJHBhdGhbXSA9ICRwYXJ0Ow0KCQkJCX0NCgkJCX0JCQkNCgkJCXJldHVybiBpbXBsb2RlKCcvJywgJHBhdGgpOw0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIG5vdF9mb3VuZCgpew0KDQoJCQkvL1NFVCBUSEUgSEVBREVSIEFTIDQwNA0KCQkJaGVhZGVyKCJIVFRQLzEuMCA0MDQgTm90IEZvdW5kIik7DQoNCgkJCS8vU0VUIFRIRSBGSUxFIFBBVEgNCgkJCSRmaWxlX3BhdGggPSBWSUVXX1BBVEguJ1N5c3RlbS80MDQucGhwJzsNCg0KCQkJLy9MT0FEIFRIRSBIRUFERVINCgkJCSR0aGlzLT5sb2FkX2hlYWRlcigpOw0KDQoJCQkvL0NIRUNLIEZPUiA0MDQgVEVNUExBVEUNCgkJCWlmKGZpbGVfZXhpc3RzKCRmaWxlX3BhdGgpKXsNCgkJCQlpbmNsdWRlICRmaWxlX3BhdGg7DQoJCQl9DQoNCgkJCS8vTk9UIFRFTVBMQVRFIEZPVU5EIEpVU1QgUFJJTlQgREVGQVVMVCBURVhUDQoJCQllbHNlew0KCQkJCWVjaG8gJ0Vycm9yOiA0MDQuIFRoZSBwYWdlIHlvdSBhcmUgbG9va2luZyBmb3Igd2FzIG5vdCBmb3VuZCc7DQoJCQl9DQoNCgkJCS8vTE9BRCBUSEUgRk9PVEVSDQoJCQkkdGhpcy0+bG9hZF9mb290ZXIoKTsNCg0KCQkJLy9FTkQgVEhFIFNDUklQVA0KCQkJZXhpdDsNCgkJfQ0KCX0NCg==',
+					SYSTEM_PATH.'controller_base.php' 		=> 'PD9waHANCgkNCgljbGFzcyB6U3BhcmtfQ29udHJvbGxlciBleHRlbmRzIHpTcGFya3sNCg0KCQlwcml2YXRlICRfZGlzYWJsZV9oZWFkZXJzID0gYXJyYXkoKTsNCg0KCQkvL0ZJTkQgVEhFIFVSTCBQQVRIIEFGVEVSIEEgVVJMIFBBUlQNCgkJcHVibGljIGZ1bmN0aW9uIERiKCRuYW1lID0gZmFsc2Upew0KCQkJcmV0dXJuICR0aGlzLT5EYigkbmFtZSk7DQoJCX0NCgkJDQoJCXB1YmxpYyBmdW5jdGlvbiByZXF1aXJlX2xvZ2luKCl7CQkJDQoJCQlpZighaXNzZXQoJF9TRVNTSU9OWydMb2dpbiddKSl7DQoJCQkJJF9TRVNTSU9OWydsb2dpbl9yZWRpcmVjdCddID0gJHRoaXMtPnJlcXVlc3QtPnJhdzsNCgkJCQkkdGhpcy0+bG9hZF9jb250cm9sbGVyKCdMb2dpbicpLT5sb2FkX3RlbXBsYXRlKCk7DQoJCQkJZXhpdDsNCgkJCX0NCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBkaXNhYmxlX2hlYWRlcnMoJGRhdGEpew0KDQoJCQlpZihpc19hcnJheSgkZGF0YSkpew0KCQkJCWZvcmVhY2goJGRhdGEgYXMgJGhlYWRlcil7DQoJCQkJCSR0aGlzLT5fZGlzYWJsZV9oZWFkZXJzW10gPSAkaGVhZGVyOw0KCQkJCX0NCgkJCX0NCgkJCWVsc2V7DQoJCQkJJHRoaXMtPl9kaXNhYmxlX2hlYWRlcnNbXSA9ICRkYXRhOw0KCQkJfQ0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIGpzX3RhZygkbmFtZSl7CQkJDQoJCQllY2hvICc8c2NyaXB0IHR5cGU9InRleHQvamF2YXNjcmlwdCIgc3JjPSInLiR0aGlzLT5jb25maWcoKS0+cGF0aC0+d2ViX3BhdGguJ2pzLycuJG5hbWUuJy5qcyI+PC9zY3JpcHQ+JzsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBjc3NfdGFnKCRuYW1lKXsJCQkNCgkJCWVjaG8gJzxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iJy4kdGhpcy0+Y29uZmlnKCktPnBhdGgtPndlYl9wYXRoLidjc3MvJy4kbmFtZS4nLmNzcyI+JzsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBsb2FkX3RlbXBsYXRlKCR0ZW1wbGF0ZSA9IGZhbHNlLCAkbG9hZF9jb250cm9sbGVyID0gZmFsc2Upew0KDQoJCQkNCg0KCQkJaWYoc3RycG9zKGdldF9jbGFzcygkdGhpcyksICdfQ29udHJvbGxlcicpKXsNCgkJCQkkY29udHJvbGxlciA9IHN0cl9yZXBsYWNlKCdfQ29udHJvbGxlcicsICcnLCBnZXRfY2xhc3MoJHRoaXMpKTsNCgkJCX0NCgkJCWVsc2V7DQoJCQkJJGNvbnRyb2xsZXIgPSAnSG9tZSc7DQoJCQkJaWYoJHRoaXMtPnJlcXVlc3QoKS0+Y29udHJvbGxlcil7DQoJCQkJCSRjb250cm9sbGVyID0gJHRoaXMtPnJlcXVlc3QoKS0+Y29udHJvbGxlcjsNCgkJCQl9DQoJCQl9DQoJCQkNCg0KCQkJLy9OTyBURU1QTEFURSBXQVMgU1BFQ0lGSUVEDQoJCQlpZigkdGVtcGxhdGUgPT0gZmFsc2Upew0KCQkJCQ0KCQkJCS8vREVGQVVMVCBUTyBJTkRFWCBURU1QTEFURQ0KCQkJCSR0ZW1wbGF0ZV9wYXRoID0gVklFV19QQVRILiRjb250cm9sbGVyLicvaW5kZXgucGhwJzsNCgkJCQkNCgkJCQkvL0lGIFRIRVJFIFdBUyBBIE1FVEhPRCBJTiBUSEUgUkVRVUVTVCBTV0lUQ0ggVE8gVEhBVCBURU1QTEFURQ0KCQkJCWlmKCR0aGlzLT5yZXF1ZXN0KCktPm1ldGhvZCl7DQoJCQkJCSR0ZW1wbGF0ZV9wYXRoID0gVklFV19QQVRILiRjb250cm9sbGVyLicvJy4kdGhpcy0+cmVxdWVzdCgpLT5tZXRob2QuJy5waHAnOw0KCQkJCX0NCgkJCX0NCg0KCQkJLy9BIFRFTVBMQVRFIFdBUyBTUEVDSUZJRUQNCgkJCWVsc2V7DQoJCQkJJHRlbXBsYXRlX3BhdGggPSBWSUVXX1BBVEguJGNvbnRyb2xsZXIuJy8nLiR0ZW1wbGF0ZS4nLnBocCc7DQoJCQl9DQoNCgkJCS8vQ0hFQ0sgVEhBVCBUSEUgVEVNUExBVEUgRVhJU1RTDQoJCQlpZihmaWxlX2V4aXN0cygkdGVtcGxhdGVfcGF0aCkpew0KCQkJCQ0KCQkJCS8vR0VUIFRIRSBIRUFERVINCgkJCQkkdGhpcy0+bG9hZF9oZWFkZXIoKTsNCg0KCQkJCS8vR0VUIFRIRSBURU1QTEFURQ0KCQkJCWluY2x1ZGUgJHRlbXBsYXRlX3BhdGg7DQoNCgkJCQkvL0dFVCBUSEUgRk9PVEVSDQoJCQkJJHRoaXMtPmxvYWRfZm9vdGVyKCk7DQoJCQkJZXhpdDsNCgkJCX0NCg0KCQkJLy9CT01CIE9VVCBFUlJPUg0KCQkJZWxzZXsNCgkJCQllY2hvICc0MDQgbm90IGZvdW5kJzsNCgkJCQlleGl0Ow0KCQkJfQ0KCQkJZXhpdDsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBsb2FkX2hlYWRlcigpew0KDQoJCQkvL1NFVCBIRUFERVIgTE9DQVRJT05TDQoJCQkkbWFpbl9oZWFkZXIgCT0gVklFV19QQVRILicvaGVhZGVyLnBocCc7DQoJCQkkbG9jYWxfaGVhZGVyIAk9IFZJRVdfUEFUSC4kdGhpcy0+cmVxdWVzdCgpLT5jb250cm9sbGVyLicvaGVhZGVyLnBocCc7DQoNCgkJCS8vREVGQVVMVCBUTyBMT0NBTCBIRUFERVINCgkJCWlmKGZpbGVfZXhpc3RzKCRsb2NhbF9oZWFkZXIpKXsNCgkJCQlpbmNsdWRlICRsb2NhbF9oZWFkZXI7DQoJCQl9DQoNCgkJCS8vTE9BRCBNQUlOIEhFQURFUg0KCQkJZWxzZWlmKGZpbGVfZXhpc3RzKCRtYWluX2hlYWRlcikpew0KCQkJCWluY2x1ZGUgJG1haW5faGVhZGVyOw0KCQkJfQ0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIGxvYWRfZm9vdGVyKCl7DQoNCgkJCSRtYWluX2Zvb3RlciAJPSBWSUVXX1BBVEguJy9mb290ZXIucGhwJzsNCgkJCSRsb2NhbF9mb290ZXIgCT0gVklFV19QQVRILiR0aGlzLT5yZXF1ZXN0KCktPmNvbnRyb2xsZXIuJy9mb290ZXIucGhwJzsNCg0KCQkJLy9ERUZBVUxUIFRPIExPQ0FMIEZPT1RFUg0KCQkJaWYoZmlsZV9leGlzdHMoJGxvY2FsX2Zvb3Rlcikpew0KCQkJCWluY2x1ZGUgJGxvY2FsX2Zvb3RlcjsNCgkJCX0NCg0KCQkJLy9MT0FEIE1BSU4gRk9PVEVSDQoJCQllbHNlaWYoZmlsZV9leGlzdHMoJG1haW5fZm9vdGVyKSl7DQoJCQkJaW5jbHVkZSAkbWFpbl9mb290ZXI7DQoJCQl9DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gbG9hZF9wYXJ0aWFsKCRuYW1lKXsNCg0KCQkJJG1haW5fcGFydGlhbCAJPSBWSUVXX1BBVEguJ3BhcnRpYWwvJy4kbmFtZS4nLnBocCc7DQoJCQkkbG9jYWxfcGFydGlhbCAJPSBWSUVXX1BBVEguJHRoaXMtPnJlcXVlc3QoKS0+Y29udHJvbGxlci4nL3BhcnRpYWwvJy4kbmFtZS4nLnBocCc7DQoNCgkJCS8vREVGQVVMVCBUTyBMT0NBTCBGT09URVINCgkJCWlmKGZpbGVfZXhpc3RzKCRsb2NhbF9wYXJ0aWFsKSl7DQoJCQkJaW5jbHVkZSAkbG9jYWxfcGFydGlhbDsNCgkJCX0NCg0KCQkJLy9MT0FEIE1BSU4gRk9PVEVSDQoJCQllbHNlaWYoZmlsZV9leGlzdHMoJG1haW5fcGFydGlhbCkpew0KCQkJCWluY2x1ZGUgJG1haW5fcGFydGlhbDsNCgkJCX0NCgkJfQ0KCX0=',
+					SYSTEM_PATH.'model_base.php' 			=> 'PD9waHAgDQoJDQoJY2xhc3MgelNwYXJrX01vZGVsIGV4dGVuZHMgelNwYXJrIHsNCg0KCQlwcml2YXRlICRfaGFzX21hbnkgCT0gYXJyYXkoKTsNCgkJcHJpdmF0ZSAkX2hhc19vbmUgCT0gYXJyYXkoKTsNCgkJcHJpdmF0ZSAkX3doZXJlIAk9IGFycmF5KCk7DQoJCXByaXZhdGUgJF9vcmRlciAJPSBhcnJheSgpOw0KCQlwcml2YXRlICRfbGltaXQ7DQoNCgkJcHVibGljIGZ1bmN0aW9uIF9fY29uc3RydWN0KCl7DQoNCgkJCS8vU0VUIFRIRSBUQUJMRSBOQU1FDQoJCQlpZighJHRoaXMtPnRhYmxlX25hbWUpew0KCQkJCSR0aGlzLT50YWJsZV9uYW1lID0gc3RydG9sb3dlcigkdGhpcy0+bW9kZWxfbmFtZSgpKTsNCgkJCX0NCgkJfQ0KDQoJCS8vRk9SV0FSRCBVTkZPVU5EIE1FVEhPRFMNCgkJcHVibGljIGZ1bmN0aW9uIF9fY2FsbCgkbmFtZSwgJHZhbHVlKXsNCg0KCQkJJGNsYXNzX25hbWUgPSBzdHJfcmVwbGFjZSgnX01vZGVsJywgJycsIGdldF9jbGFzcygkdGhpcykpOw0KCQkJJGNoZWNrX3ZhciA9IHN0cnRvbG93ZXIoJGNsYXNzX25hbWUpLidfJy4kbmFtZTsNCgkJCWlmKGlzc2V0KCR0aGlzLT4kY2hlY2tfdmFyKSl7DQoJCQkJcmV0dXJuICR0aGlzLT4kY2hlY2tfdmFyOw0KCQkJfQ0KCQkJDQoJCQkvL0NIRUNLIElGIFRISVMgTU9ERUwgSEFTIE1BTlkNCgkJCWlmKGNvdW50KCR0aGlzLT5faGFzX21hbnkpKXsNCgkJCQlmb3JlYWNoKCR0aGlzLT5faGFzX21hbnkgYXMgJGdldCl7DQoJCQkJCSRnZXRbJ3RhYmxlJ10gPSAkdGhpcy0+Z2V0X3RhYmxlX25hbWUoJGdldFsnbW9kZWwnXSk7DQoJCQkJCWlmKHN0cnRvbG93ZXIoJG5hbWUpID09IHN0cnRvbG93ZXIoJGdldFsndGFibGUnXSkgfHwgc3RydG9sb3dlcigkbmFtZSkgPT0gc3RydG9sb3dlcigkZ2V0Wydtb2RlbCddKSl7DQoNCgkJCQkJCSRmaWVsZF92YWx1ZSAJPSAkdGhpcy0+JGdldFsnbG9jYWxfZmllbGQnXTsNCgkJCQkJCSRmaWVsZF9uYW1lIAk9ICRnZXRbJ3JlbW90ZV9maWVsZCddOw0KCQkJCQkJJG1vZGVsIAkJCT0gJHRoaXMtPmxvYWRfbW9kZWwoJGdldFsnbW9kZWwnXSktPndoZXJlKCJ7JGZpZWxkX25hbWV9ID0gJ3skZmllbGRfdmFsdWV9JyIpOw0KCQkJCQkJaWYoIWVtcHR5KCR2YWx1ZSkpew0KCQkJCQkJCSRtb2RlbC0+d2hlcmUoJHZhbHVlWzBdKTsNCgkJCQkJCX0NCg0KCQkJCQkJaWYoIWVtcHR5KCRnZXRbJ3doZXJlJ10pKXsNCgkJCQkJCQlmb3JlYWNoKCRnZXRbJ3doZXJlJ10gYXMgJGZpZWxkX25hbWUgPT4gJGZpZWxkX3ZhbHVlKXsNCgkJCQkJCQkJJG1vZGVsLT53aGVyZSgieyRmaWVsZF9uYW1lfSA9ICd7JGZpZWxkX3ZhbHVlfSciKTsNCgkJCQkJCQl9DQoJCQkJCQl9DQoNCgkJCQkJCXJldHVybiAkbW9kZWwtPm9ybV9sb2FkKCk7DQoJCQkJCX0NCgkJCQl9DQoJCQl9DQoNCgkJCS8vQ0hFQ0sgSUYgVEhJUyBNT0RFTCBIQVMgT05FDQoJCQlpZihjb3VudCgkdGhpcy0+X2hhc19vbmUpKXsNCgkJCQlmb3JlYWNoKCR0aGlzLT5faGFzX29uZSBhcyAkZ2V0KXsJCQkJDQoJCQkJCSRnZXRbJ3RhYmxlJ10gPSAkdGhpcy0+Z2V0X3RhYmxlX25hbWUoJGdldFsnbW9kZWwnXSk7DQoJCQkJCWlmKHN0cnRvbG93ZXIoJG5hbWUpID09IHN0cnRvbG93ZXIoJGdldFsndGFibGUnXSkgfHwgc3RydG9sb3dlcigkbmFtZSkgPT0gc3RydG9sb3dlcigkZ2V0Wydtb2RlbCddKSl7DQoJCQkJCQkNCgkJCQkJCSRmaWVsZF92YWx1ZSAJPSAkdGhpcy0+JGdldFsnbG9jYWxfZmllbGQnXTsNCgkJCQkJCSRmaWVsZF9uYW1lIAk9ICRnZXRbJ3JlbW90ZV9maWVsZCddOwkJCQkJCQ0KCQkJCQ0KCQkJCQkJJG1vZGVsIAkJCT0gJHRoaXMtPmxvYWRfbW9kZWwoJGdldFsnbW9kZWwnXSktPndoZXJlKCJ7JGZpZWxkX25hbWV9ID0gJ3skZmllbGRfdmFsdWV9JyIpLT5saW1pdCgxKTsNCgkJCQkJCWlmKCFlbXB0eSgkdmFsdWUpKXsNCgkJCQkJCQkkbW9kZWwtPndoZXJlKCR2YWx1ZVswXSk7DQoJCQkJCQl9DQoNCgkJCQkJCWlmKCFlbXB0eSgkZ2V0Wyd3aGVyZSddKSl7DQoJCQkJCQkJZm9yZWFjaCgkZ2V0Wyd3aGVyZSddIGFzICRmaWVsZF9uYW1lID0+ICRmaWVsZF92YWx1ZSl7DQoJCQkJCQkJCSRtb2RlbC0+d2hlcmUoInskZmllbGRfbmFtZX0gPSAneyRmaWVsZF92YWx1ZX0nIik7DQoJCQkJCQkJfQ0KCQkJCQkJfQ0KDQoJCQkJCQkkbW9kZWwgPSAkbW9kZWwtPm9ybV9sb2FkKCk7DQoJCQkJCQkvL2lmKCRtb2RlbC0+Y291bnQoKSl7DQoJCQkJCQlpZihjb3VudCgkbW9kZWwpKXsNCgkJCQkJCQkkbW9kZWwgPSAkbW9kZWxbMF07DQoJCQkJCQl9DQoJCQkJCQlyZXR1cm4gJG1vZGVsOw0KCQkJCQl9DQoJCQkJfQ0KCQkJfQkJCQ0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIHdoZXJlKCRxdWVyeSl7DQoJCQkkdGhpcy0+X3doZXJlW10gPSAkcXVlcnk7CQkJDQoJCQlyZXR1cm4gJHRoaXM7DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gbGltaXQoJG51bWJlcil7DQoJCQkkdGhpcy0+X2xpbWl0ID0gJG51bWJlcjsNCgkJCXJldHVybiAkdGhpczsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBnZXRfdGFibGVfbmFtZSgkbW9kZWxfbmFtZSl7DQoJCQkkbW9kZWwgPSAkdGhpcy0+bG9hZF9tb2RlbCgkbW9kZWxfbmFtZSk7DQoNCgkJCWlmKCRtb2RlbC0+dGFibGVfbmFtZSl7DQoJCQkJJHRhYmxlX25hbWUgPSAkbW9kZWwtPnRhYmxlX25hbWU7DQoJCQl9DQoJCQllbHNlew0KCQkJCSR0YWJsZV9uYW1lID0gc3RydG9sb3dlcigkbW9kZWxfbmFtZSk7DQoJCQl9DQoNCgkJCXJldHVybiAkdGFibGVfbmFtZTsNCgkJfQkJDQoNCgkJcHVibGljIGZ1bmN0aW9uIGhhc19vbmUoJG1vZGVsX25hbWUsICRsb2NhbF9maWVsZCA9IG51bGwsICRyZW1vdGVfZmllbGQgPSBudWxsLCAkd2hlcmUgPSBhcnJheSgpKXsNCg0KCQkJJGRlZmF1bHQgPSBzdHJ0b2xvd2VyKCRtb2RlbF9uYW1lKS4nX2lkJzsNCg0KCQkJLy9TRVQgRklFTERTIElGIE5FRURFRA0KCQkJaWYoJGxvY2FsX2ZpZWxkID09IGZhbHNlKXsNCgkJCQkkbG9jYWxfZmllbGQgPSAkZGVmYXVsdDsNCgkJCX0NCgkJCWlmKCRyZW1vdGVfZmllbGQgPT0gZmFsc2Upew0KCQkJCSRyZW1vdGVfZmllbGQgPSAkZGVmYXVsdDsNCgkJCX0NCgkJCQ0KCQkJJHRoaXMtPl9oYXNfb25lW10gPSBhcnJheSgnbW9kZWwnID0+ICRtb2RlbF9uYW1lLCAnbG9jYWxfZmllbGQnID0+ICRsb2NhbF9maWVsZCwgJ3JlbW90ZV9maWVsZCcgPT4gJHJlbW90ZV9maWVsZCwgJ3doZXJlJyA9PiAkd2hlcmUpOw0KCQl9DQoNCgkJLy9TRVQgTU9ERUwgUkVMQVRJT05TSElQIFRPIE1BTlkNCgkJcHVibGljIGZ1bmN0aW9uIGhhc19tYW55KCRtb2RlbF9uYW1lLCAkbG9jYWxfZmllbGQgPSBmYWxzZSwgJHJlbW90ZV9maWVsZCA9IGZhbHNlLCAkd2hlcmUgPSBhcnJheSgpKXsNCg0KCQkJJGRlZmF1bHQgPSBzdHJ0b2xvd2VyKCRtb2RlbF9uYW1lKS4nX2lkJzsJCQkNCg0KCQkJLy9TRVQgRklFTERTIElGIE5FRURFRA0KCQkJaWYoJGxvY2FsX2ZpZWxkID09IGZhbHNlKXsNCgkJCQkkbG9jYWxfZmllbGQgPSAkdGhpcy0+Z2V0X3ByaW1hcnlfZmllbGQoc3RydG9sb3dlcigkdGhpcy0+bW9kZWxfbmFtZSgpKSk7DQoJCQl9DQoNCgkJCWlmKCRyZW1vdGVfZmllbGQgPT0gZmFsc2Upew0KCQkJCSRyZW1vdGVfZmllbGQgPSAkdGhpcy0+Z2V0X3ByaW1hcnlfZmllbGQoc3RydG9sb3dlcigkdGhpcy0+bW9kZWxfbmFtZSgpKSk7DQoJCQl9DQoNCgkJCSR0aGlzLT5faGFzX21hbnlbXSA9IGFycmF5KCdtb2RlbCcgPT4gJG1vZGVsX25hbWUsICdsb2NhbF9maWVsZCcgPT4gJGxvY2FsX2ZpZWxkLCAncmVtb3RlX2ZpZWxkJyA9PiAkcmVtb3RlX2ZpZWxkLCAnd2hlcmUnID0+ICR3aGVyZSk7DQoJCX0NCg0KCQkvL0dFVCBUSEUgTkFNRSBPRiBUSElTIE1PREVMDQoJCXB1YmxpYyBmdW5jdGlvbiBtb2RlbF9uYW1lKCl7DQoNCgkJCXJldHVybiBzdHJfcmVwbGFjZSgnX01vZGVsJywgJycsIGdldF9jbGFzcygkdGhpcykpOw0KCQl9DQoNCgkJLy9HRVQgVEhFIFBSSU1BUlkgS0VZIE9GIEEgVEFCTEUNCgkJcHVibGljIGZ1bmN0aW9uIGdldF9wcmltYXJ5X2ZpZWxkKCR0YWJsZV9uYW1lKXsNCg0KCQkJJGZpZWxkID0gJHRoaXMtPkRiKCktPmdldF9yb3coIlNIT1cgQ09MVU1OUyBGUk9NIGB7JHRhYmxlX25hbWV9YCIpOwkJCQ0KCQkJJGZpZWxkX25hbWUgPSAkZmllbGRbJ0ZpZWxkJ107CQkNCgkJCXJldHVybiAkZmllbGRfbmFtZTsNCgkJfQ0KDQoJCS8vTE9BRCBBIE1PREVMDQoJCXB1YmxpYyBmdW5jdGlvbiBvcm1fbG9hZCgkaWQgPSBmYWxzZSl7DQoNCgkJCWlmKCEkdGhpcy0+dGFibGVfbmFtZSl7DQoJCQkJJHRoaXMtPnRhYmxlX25hbWUgPSBzdHJ0b2xvd2VyKCR0aGlzLT5tb2RlbF9uYW1lKCkpOw0KCQkJfQ0KCQkJDQoJCQkkZmllbGRfbmFtZSA9ICR0aGlzLT5nZXRfcHJpbWFyeV9maWVsZCgkdGhpcy0+dGFibGVfbmFtZSk7DQoJCQkNCgkJCQ0KCQkJJHdoZXJlID0gIiBXSEVSRSAxPTEiOw0KCQkJaWYoJGlkKXsNCgkJCQkkd2hlcmUgLj0gIg0KCQkJCUFORCAoeyRmaWVsZF9uYW1lfSA9IHskaWR9KSI7DQoJCQl9DQoJCQlpZihjb3VudCgkdGhpcy0+X3doZXJlKSl7DQoJCQkJDQoNCgkJCQlmb3JlYWNoKCR0aGlzLT5fd2hlcmUgYXMgJHEpew0KCQkJCQkkd2hlcmUgLj0gIg0KCQkJCQkJQU5EICh7JHF9KSAiOw0KCQkJCX0NCgkJCX0NCg0KCQkJJGxpbWl0ID0gIiI7DQoJCQlpZigkdGhpcy0+X2xpbWl0KXsNCgkJCQkkbGltaXQgPSAiIExJTUlUIHskdGhpcy0+X2xpbWl0fSI7DQoJCQl9DQoNCgkJCSRvcmRlciA9ICJPUkRFUiBCWSB7JGZpZWxkX25hbWV9IEFTQyI7DQoJCQlpZigkdGhpcy0+X29yZGVyKXsNCgkJCQkkb3JkZXIgPSAkdGhpcy0+X29yZGVyOw0KCQkJfQ0KDQoNCgkJCSRzcWwgPSAiU0VMRUNUICogRlJPTSBgeyR0aGlzLT50YWJsZV9uYW1lfWAgeyR3aGVyZX0geyRvcmRlcn0geyRsaW1pdH0gIjsNCg0KDQoJCQkNCgkJCWlmKCRpZCA9PT0gZmFsc2Upew0KDQoJCQkJJHJlcyA9ICR0aGlzLT5EYigpLT5nZXRfcm93cygkc3FsKTsNCgkJCQkkcmV0ID0gbmV3IE9ybV9XcmFwcGVyOw0KCQkJCS8vJHJldCA9IGFycmF5KCk7DQoJCQkJaWYoJHJlcyl7DQoJCQkJCWZvcmVhY2goJHJlcyBhcyAka2V5PT4kcmVjb3JkKXsNCgkJCQkJCSRyZXQtPiRrZXkgPSAkdGhpcy0+b3JtX2xvYWQoJHJlY29yZFskZmllbGRfbmFtZV0pOw0KCQkJCQkJLy8kcmV0WyRrZXldID0gJHRoaXMtPm9ybV9sb2FkKCRyZWNvcmRbJGZpZWxkX25hbWVdKTsNCgkJCQkJfQ0KCQkJCX0NCgkJCQlyZXR1cm4gJHJldDsNCgkJCQkNCgkJCX0NCgkJCWVsc2V7CQ0KCQkJCSRtb2RlbF9uYW1lID0gJHRoaXMtPm1vZGVsX25hbWUoKS4nX01vZGVsJzsgDQoJCQkJJG1vZGVsID0gbmV3ICRtb2RlbF9uYW1lOwkJCQ0KCQkJCSRyZXMgPSAkbW9kZWwtPkRiKCktPmdldF9yb3coJHNxbCk7DQoJCQkJJG1vZGVsLT5vcm1fc2V0KCRyZXMpOw0KCQkJCXJldHVybiAkbW9kZWw7DQoJCQl9DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gb3JtX3NldCgkZGF0YSA9IGFycmF5KCkpew0KCQkJDQoJCQlmb3JlYWNoKCRkYXRhIGFzICRrZXk9PiR2YWx1ZSl7DQoJCQkJJHRoaXMtPiRrZXkgPSAkdmFsdWU7DQoJCQl9CQkJDQoJCQlyZXR1cm4gJHRoaXM7DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gb3JtX3NhdmUoKXsNCgkJCQ0KCQkJLy9FWFRSQUNUIERBVEENCgkJCSRkYXRhID0gJHRoaXMtPmV4cG9zZV9kYXRhKCk7DQoJCQl1bnNldCgkZGF0YVsndGFibGVfbmFtZSddKTsNCgkJCXVuc2V0KCRkYXRhWydfaGFzX21hbnknXSk7DQoJCQl1bnNldCgkZGF0YVsnX2hhc19vbmUnXSk7DQoJCQkNCgkJCS8vU0VUIFRIRSBUQUJMRSBOQU1FDQoJCQlpZighJHRoaXMtPnRhYmxlX25hbWUpew0KCQkJCSR0aGlzLT50YWJsZV9uYW1lID0gc3RydG9sb3dlcigkdGhpcy0+bW9kZWxfbmFtZSgpKTsNCgkJCX0NCg0KCQkJLy9HRVQgVEhFIFBSSU1BUlkgRklFTEQNCgkJCSRwcmltYXJ5X2ZpZWxkID0gJHRoaXMtPmdldF9wcmltYXJ5X2ZpZWxkKCR0aGlzLT50YWJsZV9uYW1lKTsNCg0KCQkJLy9JTlNFUlQgQSBORVcgUkVDT1JEDQoJCQlpZighJGRhdGFbJHByaW1hcnlfZmllbGRdKXsNCgkJCQkkaWQgPSAkdGhpcy0+RGIoKS0+aW5zZXJ0KCR0aGlzLT50YWJsZV9uYW1lLCAkZGF0YSk7DQoJCQl9DQoNCg0KCQkJLy9VUERBVEUgVEhFIFJFQ09SRCBCRUNBVVNFIEFOIElEIFdBUyBQUk9WSURFRA0KCQkJZWxzZXsNCgkJCQkNCgkJCQkvL0NIRUNLIFRIQVQgVEhFIFJFQ09SRCBFWElTVFMNCgkJCQlpZigkdGhpcy0+RGIoKS0+Z2V0X3JvdygiU0VMRUNUICogRlJPTSBgeyR0aGlzLT50YWJsZV9uYW1lfWAgV0hFUkUgeyRwcmltYXJ5X2ZpZWxkfSA9ICd7JGRhdGFbJHByaW1hcnlfZmllbGRdfSciKSl7DQoJCQkJCSR0aGlzLT5EYigpLT51cGRhdGUoJHRoaXMtPnRhYmxlX25hbWUsICRkYXRhLCAieyRwcmltYXJ5X2ZpZWxkfSA9ICd7JGRhdGFbJHByaW1hcnlfZmllbGRdfSciKTsNCgkJCQkJJGlkID0gJGRhdGFbJHByaW1hcnlfZmllbGRdOw0KCQkJCX0NCgkJCQkNCgkJCQkvL0NSRUFURSBBIE5FVyBSRUNPUkQNCgkJCQllbHNlew0KCQkJCQkkaWQgPSAkdGhpcy0+RGIoKS0+aW5zZXJ0KCR0aGlzLT50YWJsZV9uYW1lLCAkZGF0YSk7DQoJCQkJfQ0KCQkJfQ0KCQkNCgkJCXJldHVybiAkdGhpcy0+b3JtX2xvYWQoJGlkKTsNCg0KCQl9DQoNCgkJLy9ERUxFVEUgQSBSRUNPUkQNCgkJcHVibGljIGZ1bmN0aW9uIG9ybV9kZWxldGUoKXsNCg0KCQkJLy9FWFRSQUNUIERBVEENCgkJCSRkYXRhID0gJHRoaXMtPmV4cG9zZV9kYXRhKCk7DQoNCgkJCS8vR0VUIFRIRSBQUklNQVJZIEZJRUxEDQoJCQkkcHJpbWFyeV9maWVsZCA9ICR0aGlzLT5nZXRfcHJpbWFyeV9maWVsZCgkdGhpcy0+dGFibGVfbmFtZSk7DQoNCgkJCS8vREVMRVRFIFRIRSBSRUNPUkQNCgkJCXJldHVybiAkdGhpcy0+RGIoKS0+cXVlcnkoIkRFTEVURSBGUk9NIGB7JHRoaXMtPnRhYmxlX25hbWV9YCBXSEVSRSB7JHByaW1hcnlfZmllbGR9ID0gJ3skZGF0YVskcHJpbWFyeV9maWVsZF19JyIpOw0KDQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gZXhwb3NlX2RhdGEoKXsNCgkJCXJldHVybiBnZXRfb2JqZWN0X3ZhcnMoJHRoaXMpOyANCgkJfQ0KCX0NCg==',
+					SYSTEM_PATH.'orm_wrapper.php'			=> 'PD9waHANCgkvL09STSBXUkFQUEVSIEJBU0UgQ0xBU1MNCgljbGFzcyBPUk1fV3JhcHBlciBleHRlbmRzIHpTcGFya19Nb2RlbHsNCg0KCQlwdWJsaWMgZnVuY3Rpb24gX19jb25zdHJ1Y3QoKXsNCgkJCXVuc2V0KCR0aGlzLT5yZXF1ZXN0KTsNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBmaXJzdCgpew0KCQkJZm9yZWFjaCgkdGhpcyBhcyAkZWwpew0KCQkJCXJldHVybiAkZWw7DQoJCQl9DQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gY291bnQoKXsNCgkJCSRjb3VudCA9IDA7DQoJCQlmb3JlYWNoKCR0aGlzIGFzICRlbCl7DQoJCQkJJGNvdW50Kys7DQoJCQl9DQoJCQlyZXR1cm4gJGNvdW50Ow0KCQl9DQoNCgkJcHVibGljIGZ1bmN0aW9uIGxhc3QoKXsNCgkJCSRjb3VudCA9ICR0aGlzLT5jb3VudCgpLTE7DQoJCQlyZXR1cm4gJHRoaXMtPiRjb3VudDsNCgkJfQ0KCX0=',
+					SYSTEM_PATH.'database.php'				=> 'PD9waHANCg0KCWNsYXNzIHpTcGFya19EYXRhYmFzZXsNCg0KCQlwdWJsaWMgJGNvbm47DQoJCXB1YmxpYyAkcTsNCgkJcHVibGljICRudW1fcm93czsNCgkJcHVibGljICRpbnNlcnRlZF9jb2x1bW5zOw0KCQ0KCQlmdW5jdGlvbiBhZGRfZXJyb3IoJGFycikNCgkJew0KCQkJcHJpbnRfcigkYXJyKTsNCgkJfQ0KCQkNCgkJZnVuY3Rpb24gY29ubmVjdCgpDQoJCXsNCgkJCS8vIFB1dCB0aGUgY29ubmVjdGlvbiBpbnRvICR0aGlzLT5jb25uDQoJCQkkdGhpcy0+Y29ubiA9IG15c3FsX2Nvbm5lY3QoJHRoaXMtPmNyZWRlbnRpYWxzWydkYl9ob3N0J10sICR0aGlzLT5jcmVkZW50aWFsc1snZGJfdXNlcm5hbWUnXSwgJHRoaXMtPmNyZWRlbnRpYWxzWydkYl9wYXNzd29yZCddKTsNCgkJCW15c3FsX3NlbGVjdF9kYigkdGhpcy0+Y3JlZGVudGlhbHNbJ2RiX25hbWUnXSwgJHRoaXMtPmNvbm4pOw0KCQl9DQoNCgkJZnVuY3Rpb24gcXVlcnkoJHF1ZXJ5KQ0KCQl7DQoJCQkkdGhpcy0+cSA9IE5VTEw7DQoJCQkkdGhpcy0+bnVtX3Jvd3MgPSBOVUxMOw0KCQkJJHRoaXMtPnEgPSBteXNxbF9xdWVyeSgkcXVlcnksICR0aGlzLT5jb25uKTsNCgkJCWlmKCR0aGlzLT5xKQ0KCQkJew0KCQkJCS8vJHRoaXMtPmFkZF9mbGFzaCgkcXVlcnkpOw0KCQkJCSRyZXQgPSBUUlVFOw0KCQkJfWVsc2V7DQoJCQkJJHRoaXMtPmFkZF9lcnJvcihhcnJheSgwID0+ICRxdWVyeSwgMSA9PiBteXNxbF9lcnJvcigpKSk7DQoJCQkJJHJldCA9IEZBTFNFOw0KCQkJfQ0KCQkJcmV0dXJuICRyZXQ7DQoJCX0NCgkJDQoJCWZ1bmN0aW9uIGdldF9yb3coJHF1ZXJ5KQ0KCQl7DQoJCQkNCgkJCS8vIFBlcmZvcm0gdGhlIHF1ZXJ5DQoJCQlpZighJHRoaXMtPnF1ZXJ5KCRxdWVyeSkpDQoJCQl7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfQ0KCQkJLy8gR2V0IHJlc3VsdHMgZnJvbSBxdWVyeQ0KCQkJaWYobXlzcWxfbnVtX3Jvd3MoJHRoaXMtPnEpID09IDApDQoJCQl7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfWVsc2V7DQoJCQkJcmV0dXJuICR0aGlzLT5zdHJpcHNsYXNoZXNfZGVlcChteXNxbF9mZXRjaF9hc3NvYygkdGhpcy0+cSkpOw0KCQkJfQ0KCQl9DQoNCgkJDQoJCWZ1bmN0aW9uIGdldF9yb3dzKCRxdWVyeSkNCgkJew0KCQkJLy8gUGVyZm9ybSB0aGUgcXVlcnkNCgkJCWlmKCEkdGhpcy0+cXVlcnkoJHF1ZXJ5KSkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9DQoJCQkvLyBHZXQgcmVzdWx0cyBmcm9tIHF1ZXJ5DQoJCQlpZihteXNxbF9udW1fcm93cygkdGhpcy0+cSkgPT0gMCkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9ZWxzZXsNCgkJCQl3aGlsZSgkciA9IG15c3FsX2ZldGNoX2Fzc29jKCR0aGlzLT5xKSkNCgkJCQl7DQoJCQkJCSRyZXRbXSA9ICR0aGlzLT5zdHJpcHNsYXNoZXNfZGVlcCgkcik7DQoJCQkJfQ0KCQkJCXJldHVybiAkcmV0Ow0KCQkJfQ0KCQl9DQoNCg0KCQkNCgkJDQoJCQ0KCQlmdW5jdGlvbiBpbnNlcnQoJHRhYmxlLCAkZGF0YSkNCgkJew0KCQkJJHRoaXMtPmluc2VydGVkX2NvbHVtbnMgPSBhcnJheSgpOw0KCQkJLy8gUGVyZm9ybSB0aGUgcXVlcnkNCgkJCWlmKCEkdGhpcy0+cXVlcnkoIlNIT1cgQ09MVU1OUyBGUk9NIGB7JHRhYmxlfWAiKSkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9DQoJCQkvLyBHZXQgcmVzdWx0cyBmcm9tIHF1ZXJ5DQoJCQlpZihteXNxbF9udW1fcm93cygkdGhpcy0+cSkgPT0gMCkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9ZWxzZXsNCgkJCQl3aGlsZSgkciA9IG15c3FsX2ZldGNoX2Fzc29jKCR0aGlzLT5xKSkNCgkJCQl7DQoJCQkJCSRmaWVsZHNbJHJbJ0ZpZWxkJ11dID0gYXJyYXkoDQoJCQkJCQkndHlwZScgPT4gJHJbJ1R5cGUnXSwNCgkJCQkJCSdrZXknID0+ICRyWydLZXknXSwNCgkJCQkJKTsNCgkJCQl9DQoJCQkJJGRhdGEgPSAkdGhpcy0+c3RyaXBzbGFzaGVzX2RlZXAoJGRhdGEpOw0KCQkJCWZvcmVhY2goJGRhdGEgYXMgJGsgPT4gJHYpDQoJCQkJew0KCQkJCQlpZihpc19hcnJheSgkZmllbGRzWyRrXSkpDQoJCQkJCXsNCgkJCQkJCSR0aGlzLT5pbnNlcnRlZF9jb2x1bW5zWyRrXSA9ICRrOw0KCQkJCQkJJHYgPSAkdGhpcy0+ZXNjYXBlKCR2KTsNCgkJCQkJCSRxdWVyeSAuPSAiIGB7JGt9YCA9ICd7JHZ9JywgIjsNCgkJCQkJfQ0KCQkJCX0NCgkJCQkkcXVlcnkgPSB0cmltKCRxdWVyeSwgJyAsJyk7DQoJCQkJJGNvbXBsZXRlID0gIklOU0VSVCBJTlRPIGB7JHRhYmxlfWAgU0VUIHskcXVlcnl9IjsNCgkJCQlpZigkdGhpcy0+cXVlcnkoJGNvbXBsZXRlKSkNCgkJCQl7DQoJCQkJCXJldHVybiBteXNxbF9pbnNlcnRfaWQoJHRoaXMtPmNvbm4pOw0KCQkJCX1lbHNlew0KCQkJCQlyZXR1cm4gZmFsc2U7DQoJCQkJfQ0KCQkJfQ0KCQl9DQoNCgkNCgkJZnVuY3Rpb24gdXBkYXRlKCR0YWJsZSwgJGRhdGEsICR3aGVyZSkNCgkJew0KCQkJaWYoIXN0cnN0cignICcuJHdoZXJlLCAnPScpKQ0KCQkJew0KCQkJCSR0aGlzLT5hZGRfZXJyb3IoJ05vIHdoZXJlIGNsYXVzZSBzcGVjaWZpZWQuIEV4aXRpbmcgdXBkYXRlLicpOw0KCQkJCXJldHVybiBGQUxTRTsNCgkJCX0NCgkJCS8vIFBlcmZvcm0gdGhlIHF1ZXJ5DQoJCQlpZighJHRoaXMtPnF1ZXJ5KCJTSE9XIENPTFVNTlMgRlJPTSBgeyR0YWJsZX1gIikpDQoJCQl7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfQ0KCQkJLy8gR2V0IHJlc3VsdHMgZnJvbSBxdWVyeQ0KCQkJaWYobXlzcWxfbnVtX3Jvd3MoJHRoaXMtPnEpID09IDApDQoJCQl7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfWVsc2V7DQoJCQkJd2hpbGUoJHIgPSBteXNxbF9mZXRjaF9hc3NvYygkdGhpcy0+cSkpDQoJCQkJew0KCQkJCQkkZmllbGRzWyRyWydGaWVsZCddXSA9IGFycmF5KA0KCQkJCQkJJ3R5cGUnID0+ICRyWydUeXBlJ10sDQoJCQkJCQkna2V5JyA9PiAkclsnS2V5J10sDQoJCQkJCSk7DQoJCQkJfQ0KCQkJCSRkYXRhID0gJHRoaXMtPnN0cmlwc2xhc2hlc19kZWVwKCRkYXRhKTsNCgkJCQlmb3JlYWNoKCRkYXRhIGFzICRrID0+ICR2KQ0KCQkJCXsNCgkJCQkJaWYoaXNfYXJyYXkoJGZpZWxkc1ska10pICYmICRmaWVsZHNbJGtdWydrZXknXSAhPSAnUFJJJykNCgkJCQkJew0KCQkJCQkJJHYgPSAkdGhpcy0+ZXNjYXBlKCR2KTsNCgkJCQkJCSRxdWVyeSAuPSAiIGB7JGt9YCA9ICd7JHZ9JywgIjsNCgkJCQkJfQ0KCQkJCX0NCgkJCQkkcXVlcnkgPSB0cmltKCRxdWVyeSwgJyAsJyk7DQoJCQkJJGNvbXBsZXRlID0gIlVQREFURSBgeyR0YWJsZX1gIFNFVCB7JHF1ZXJ5fSBXSEVSRSB7JHdoZXJlfSI7DQoJCQkJcmV0dXJuICR0aGlzLT5xdWVyeSgkY29tcGxldGUpOw0KCQkJfQ0KCQl9DQoNCgkJZnVuY3Rpb24gbnVtX3Jvd3MoKQ0KCQl7DQoJCQlyZXR1cm4gbXlzcWxfbnVtX3Jvd3MoJHRoaXMtPnEpOw0KCQl9DQoNCg0KDQoJCS8qKg0KCQkgKiBFc2NhcGUgYSBzdHJpbmcNCgkJICoNCgkJICogQHBhcmFtIHN0cmluZyAkdmFsdWUNCgkJICogQHJldHVybiBzdHJpbmcgcmVzdWx0cw0KCQkgKi8NCgkJZnVuY3Rpb24gZXNjYXBlKCR2YWx1ZSkNCgkJew0KCQkJaWYoaXNfYXJyYXkoJHZhbHVlKSkNCgkJCXsNCgkJCQlyZXR1cm4gbXlzcWxfcmVhbF9lc2NhcGVfc3RyaW5nKHNlcmlhbGl6ZSgkdmFsdWUpLCAkdGhpcy0+Y29ubik7DQoJCQl9DQoJCQlyZXR1cm4gbXlzcWxfcmVhbF9lc2NhcGVfc3RyaW5nKCR2YWx1ZSwgJHRoaXMtPmNvbm4pOw0KCQl9DQoNCgkJDQoJCS8qKg0KCQkgKiBSZWN1cnNpdmVseSByZW1vdmUgc2xhc2ggY2hhcmFjdGVycyBmcm9tIGFuIGFycmF5IG9yIHN0cmluZw0KCQkgKg0KCQkgKiBAcGFyYW0gYXJyYXkvc3RyaW5nICR2YWx1ZQ0KCQkgKiBAcmV0dXJuIGFycmF5IHJlc3VsdHMNCgkJICovDQoJCWZ1bmN0aW9uIGVzY2FwZV9kZWVwKCR2YWx1ZSkNCgkJew0KCQkJaWYoaXNfYXJyYXkoJHZhbHVlKSkNCgkJCXsNCgkJCQlmb3JlYWNoKCR2YWx1ZSBhcyAkaz0+JHYpDQoJCQkJew0KCQkJCQkkdmFsdWVbJGtdID0gJHRoaXMtPmVzY2FwZV9kZWVwKCR2KTsNCgkJCQl9DQoJCQkJcmV0dXJuICR2YWx1ZTsNCgkJCX1lbHNlew0KCQkJCXJldHVybiBteXNxbF9yZWFsX2VzY2FwZV9zdHJpbmcoJHZhbHVlLCAkdGhpcy0+Y29ubik7DQoJCQl9DQoJCX0NCg0KDQoJCS8qKg0KCQkgKiBSZWN1cnNpdmVseSByZW1vdmUgc2xhc2ggY2hhcmFjdGVycyBmcm9tIGFuIGFycmF5IG9yIHN0cmluZw0KCQkgKg0KCQkgKiBAcGFyYW0gYXJyYXkvc3RyaW5nICR2YWx1ZQ0KCQkgKiBAcmV0dXJuIGFycmF5IHJlc3VsdHMNCgkJICovDQoJCWZ1bmN0aW9uIHN0cmlwc2xhc2hlc19kZWVwKCR2YWx1ZSkNCgkJew0KCQkJaWYoaXNfb2JqZWN0KCR2YWx1ZSkpew0KCQkJCXJldHVybiAkdmFsdWU7DQoJCQl9DQoJCQlpZihpc19hcnJheSgkdmFsdWUpKQ0KCQkJew0KCQkJCWZvcmVhY2goJHZhbHVlIGFzICRrPT4kdikNCgkJCQl7DQoJCQkJCSR2YWx1ZVska10gPSAkdGhpcy0+c3RyaXBzbGFzaGVzX2RlZXAoJHYpOw0KCQkJCX0NCgkJCQlyZXR1cm4gJHZhbHVlOw0KCQkJfWVsc2V7CQkJDQoJCQkJcmV0dXJuIHN0cmlwc2xhc2hlcygkdmFsdWUpOw0KCQkJfQ0KCQl9DQoNCg0KDQoJCS8qKg0KCQkgKiBXaWxsIHB1bGwgYSBzaW5nbGUgcmVzdWx0IGZyb20gdGFibGUsIGpvaW5pbmcNCgkJICogaW4gYW55IHRhYmxlIHdpdGggdGhlIGFwcHJvcHJpYXRlIG5hbWluZyBwcmVmaXguDQoJCSAqIElmIHRoZXJlIGlzIGEgZmllbGQgaW4gdGFibGUgbmFtZWQgYWRkcmVzc19pZCwgaXQNCgkJICogd2lsbCBsb29rIGZvciBhIHRhYmxlIG5hbWVkIGFkZHJlc3MsIGFuZCB0aGVuDQoJCSAqIGpvaW4gaW4gdGhlIHJvdyB3aXRoIHRoZSB2YWx1ZSBzdG9yZWQgaW4gdGhhdCBmaWVsZC4NCgkJICoNCgkJICogQHBhcmFtIHN0cmluZyAkdGFibGUNCgkJICogQHBhcmFtIHN0cmluZyAkd2hlcmUNCgkJICogQHJldHVybiBhcnJheSByZXN1bHRzDQoJCSAqLw0KCQlmdW5jdGlvbiBmZXRjaF9jb21wbGV0ZSgkdGFibGUsICR3aGVyZSkNCgkJew0KCQkJLy8gTWFrZSBzdXJlIHRoZXJlIGlzIGEgd2hlcmUgY2xhdXNlDQoJCQlpZighc3Ryc3RyKCcgJy4kd2hlcmUsICc9JykpDQoJCQl7DQoJCQkJJHRoaXMtPmFkZF9lcnJvcignTm8gd2hlcmUgY2xhdXNlIHNwZWNpZmllZC4gRXhpdGluZyBmZXRjaF9jb21wbGV0ZS4nKTsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9DQoJCQkvLyBGZXRjaCB0YWJsZSBuYW1lcyBmb3IgbGF0ZXINCgkJCWlmKCEkdGhpcy0+Z2V0X3RhYmxlX25hbWVzKCkpDQoJCQl7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfQ0KCQkJLy8gUGVyZm9ybSB0aGUgcXVlcnkNCgkJCWlmKCEkdGhpcy0+cXVlcnkoIlNIT1cgQ09MVU1OUyBGUk9NIGB7JHRhYmxlfWAiKSkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9DQoJCQkvLyBHZXQgcmVzdWx0cyBmcm9tIHF1ZXJ5DQoJCQlpZihteXNxbF9udW1fcm93cygkdGhpcy0+cSkgPT0gMCkNCgkJCXsNCgkJCQlyZXR1cm4gRkFMU0U7DQoJCQl9ZWxzZXsNCgkJCQl3aGlsZSgkciA9IG15c3FsX2ZldGNoX2Fzc29jKCR0aGlzLT5xKSkNCgkJCQl7DQoJCQkJCSRmaWVsZHNbJHJbJ0ZpZWxkJ11dID0gYXJyYXkoDQoJCQkJCQkndHlwZScgPT4gJHJbJ1R5cGUnXSwNCgkJCQkJCSdrZXknID0+ICRyWydLZXknXSwNCgkJCQkJKTsNCgkJCQl9DQoNCgkJCQkkY29tcGxldGUgPSAiU0VMRUNUICogRlJPTSB7JHRhYmxlfSBXSEVSRSB7JHdoZXJlfSI7DQoJCQkJJHJldHVybiA9ICR0aGlzLT5nZXRfcm93KCRjb21wbGV0ZSk7CQkJCQ0KDQoJCQkJaWYoJHJldHVybiAhPT0gRkFMU0UpDQoJCQkJew0KCQkJCQkkZmluYWxfcmV0dXJuID0gJHJldHVybjsNCgkJCQkJZm9yZWFjaCgkcmV0dXJuIGFzICRrZXkgPT4gJHZhbCkNCgkJCQkJew0KCQkJCQkJaWYocHJlZ19tYXRjaCgnLyhbYS16XzAtOV0rKV9pZC9pJywgJGtleSwgJG1hdGNoZXMpKQ0KCQkJCQkJew0KCQkJCQkJCWlmKCRtYXRjaGVzWzFdICE9ICR0YWJsZSAmJiBhcnJheV9zZWFyY2goJG1hdGNoZXNbMV0sICR0aGlzLT50YWJsZXMpICE9PSBGQUxTRSkNCgkJCQkJCQl7DQoJCQkJCQkJCSRnZXRfam9pbiA9ICR0aGlzLT5nZXRfcm93KCJTRUxFQ1QgKiBGUk9NIHskbWF0Y2hlc1sxXX0gV0hFUkUgeyRrZXl9ID0gJ3skdmFsfScgIik7DQoJCQkJCQkJCWlmKCRnZXRfam9pbiAhPT0gRkFMU0UpDQoJCQkJCQkJCXsNCgkJCQkJCQkJCSRmaW5hbF9yZXR1cm4gPSBhcnJheV9tZXJnZSgkZmluYWxfcmV0dXJuLCAkZ2V0X2pvaW4pOw0KCQkJCQkJCQl9DQoJCQkJCQkJfQ0KCQkJCQkJfQ0KCQkJCQl9DQoJCQkJfQ0KCQkJCXJldHVybiAkZmluYWxfcmV0dXJuOw0KDQoJCQl9DQoJCX0NCg0KDQoNCgkJLyoqDQoJCSAqIEdldCBhbGwgb2YgdGhlIHRhYmxlIG5hbWVzIGZvciB0aGUgY3VycmVudCBkYXRhYmFzZSwNCgkJICogc3RvcmUgdGhlIHJlc3VsdGluZyBhcnJheSBpbiAkdGhpcy0+dGFibGVzDQoJCSAqDQoJCSAqIEByZXR1cm4gYm9vbGVhbiBzdWNjZXNzDQoJCSAqLw0KCQlmdW5jdGlvbiBnZXRfdGFibGVfbmFtZXMoKQ0KCQl7DQoJCQkvLyBHZXQgYWxsIG9mIHRoZSB0YWJsZSBuYW1lcw0KCQkJaWYoISR0aGlzLT5xdWVyeSgiU0hPVyBUQUJMRVMiKSkNCgkJCXsNCgkJCQkkdGhpcy0+YWRkX2Vycm9yKCJDb3VsZCBub3QgZ2V0IHRhYmxlIG5hbWVzLiIpOw0KCQkJCXJldHVybiBGQUxTRTsNCgkJCX0NCgkJCS8vIEdldCByZXN1bHRzIGZyb20gcXVlcnkNCgkJCWlmKG15c3FsX251bV9yb3dzKCR0aGlzLT5xKSA9PSAwKQ0KCQkJew0KCQkJCSR0aGlzLT5hZGRfZXJyb3IoIkNvdWxkIG5vdCBnZXQgdGFibGUgbmFtZXMuIik7DQoJCQkJcmV0dXJuIEZBTFNFOw0KCQkJfWVsc2V7DQoJCQkJd2hpbGUoJHIgPSBteXNxbF9mZXRjaF9hcnJheSgkdGhpcy0+cSkpDQoJCQkJew0KCQkJCQkkdGhpcy0+dGFibGVzW10gPSAkclswXTsNCgkJCQl9DQoJCQkJcmV0dXJuIFRSVUU7DQoJCQl9DQoJCX0NCg0KDQoJCS8vIEdldCB2YWxpZCBlbnVtIHZhbHVlcyBmcm9tIGEgY29sdW1uDQoJCS8vIEJvcnJvd2VkIGZyb20gcGhwLm5ldA0KCQlmdW5jdGlvbiBnZXRfZW51bSgkdGFibGUsICRmaWVsZCwgJHVjZmlyc3RfdmFsdWVzID0gVFJVRSkNCgkJew0KCQkJJHJlc3VsdCA9ICR0aGlzLT5xdWVyeSgic2hvdyBjb2x1bW5zIGZyb20geyR0YWJsZX0iKTsNCgkJCSR0eXBlcyA9IGFycmF5KCk7DQoJCQl3aGlsZSgkdHVwbGU9bXlzcWxfZmV0Y2hfYXNzb2MoJHRoaXMtPnEpKQ0KCQkJew0KCQkJCWlmKCR0dXBsZVsnRmllbGQnXSA9PSAkZmllbGQpDQoJCQkJew0KCQkJCQkkdHlwZXM9JHR1cGxlWydUeXBlJ107DQoJCQkJCSRiZWdpblN0cj1zdHJwb3MoJHR5cGVzLCIoIikrMTsNCgkJCQkJJGVuZFN0cj1zdHJwb3MoJHR5cGVzLCIpIik7DQoJCQkJCSR0eXBlcz1zdWJzdHIoJHR5cGVzLCRiZWdpblN0ciwkZW5kU3RyLSRiZWdpblN0cik7DQoJCQkJCSR0eXBlcz1zdHJfcmVwbGFjZSgiJyIsIiIsJHR5cGVzKTsNCgkJCQkJJHR5cGVzPXNwbGl0KCcsJywkdHlwZXMpOw0KCQkJCQlpZigkc29ydGVkKQ0KCQkJCQl7DQoJCQkJCQlzb3J0KCR0eXBlcyk7DQoJCQkJCX0NCgkJCQl9DQoJCQl9DQoJCQlmb3JlYWNoKCR0eXBlcyBhcyAkdikNCgkJCXsNCgkJCQlpZigkdWNmaXJzdF92YWx1ZXMpDQoJCQkJew0KCQkJCQkkcmV0WyR2XSA9IHVjZmlyc3QoJHYpOw0KCQkJCX1lbHNlew0KCQkJCQkkcmV0WyR2XSA9ICR2OwkNCgkJCQl9DQoJCQl9DQoJCQlyZXR1cm4gJHJldDsNCgkJfQ0KCX0=',
+				),
+
+				//CONTROLLER FILES
+				'controller' => array(
+					CONTROLLER_PATH.'Home_Controller.php'	=> 'PD9waHANCgljbGFzcyBIb21lX0NvbnRyb2xsZXIgZXh0ZW5kcyB6U3BhcmtfQ29udHJvbGxlciB7DQoNCgkJcHVibGljIGZ1bmN0aW9uIF9fY29uc3RydWN0KCl7DQoJCQkvL0RPIFNUVUZGIEhFUkUgV0hFTiBUSEUgQ09OVFJPTExFUiBJUyBMT0FERUQNCgkJfQ0KDQoJCXB1YmxpYyBmdW5jdGlvbiBpbmRleCgpew0KCQkJLy9ETyBTVFVGRiBIRVJFIFdIRU4gVEhFIERFRkFVTFQgVklFVyBJUyBMT0FERUQNCgkJfQ0KCX0NCg==',
+					CONTROLLER_PATH.'Login_Controller.php'	=> 'PD9waHANCgljbGFzcyBMb2dpbl9Db250cm9sbGVyIGV4dGVuZHMgelNwYXJrX0NvbnRyb2xsZXIgew0KDQoJCXB1YmxpYyBmdW5jdGlvbiBfX2NvbnN0cnVjdCgpew0KCQkJLy9ETyBTVFVGRiBIRVJFIFdIRU4gVEhFIENPTlRST0xMRVIgSVMgTE9BREVEDQoJCX0NCg0KCQlwdWJsaWMgZnVuY3Rpb24gaW5kZXgoKXsNCgkJCS8vRE8gU1RVRkYgSEVSRSBXSEVOIFRIRSBERUZBVUxUIFZJRVcgSVMgTE9BREVEDQoJCX0NCgl9',
+				),
+				
+				//MODEL FILES
+				'model'			=> array(
+
+				),
+				
+				//VIEW FILES
+				'view'			=> array(
+					VIEW_PATH.'Home/index.php'				=> 'PGgxPldlbGNvbWUgdG8gelNwYXJrPC9oMT4=',
+					VIEW_PATH.'Login/index.php'				=> 'PGRpdiBjbGFzcz0iY29udGFpbmVyIj4NCgk8ZGl2IGNsYXNzPSJwYWdlLWhlYWRlciI+UGxlYXNlIExvZ2luPC9kaXY+DQoJPGZvcm0+DQoJCTxkaXYgY2xhc3M9ImZvcm0tZ3JvdXAiPg0KCSAgICAJPGxhYmVsIGZvcj0iZW1haWwiPkVtYWlsIGFkZHJlc3M8L2xhYmVsPg0KCSAgICAJPGlucHV0IHR5cGU9ImVtYWlsIiBjbGFzcz0iZm9ybS1jb250cm9sIiBpZD0iZW1haWwiIG5hbWU9ImVtYWlsIiBwbGFjZWhvbGRlcj0iRW1haWwiPg0KCSAgCTwvZGl2Pg0KCQk8ZGl2IGNsYXNzPSJmb3JtLWdyb3VwIj4NCgkJCTxsYWJlbCBmb3I9InBhc3N3b3JkIj5QYXNzd29yZDwvbGFiZWw+DQoJCQk8aW5wdXQgdHlwZT0icGFzc3dvcmQiIGNsYXNzPSJmb3JtLWNvbnRyb2wiIGlkPSJwYXNzd29yZCIgbmFtZT0icGFzc3dvcmQiIHBsYWNlaG9sZGVyPSJQYXNzd29yZCI+DQoJCTwvZGl2Pg0KCSAgPGJ1dHRvbiB0eXBlPSJzdWJtaXQiIGNsYXNzPSJidG4gYnRuLWRlZmF1bHQiPlN1Ym1pdDwvYnV0dG9uPg0KCTwvZm9ybT4NCjwvZGl2Pg==',
+					VIEW_PATH.'header.php'					=> 'PCFET0NUWVBFIGh0bWw+DQo8aHRtbCBsYW5nPSJlbiI+DQogIAk8aGVhZD4NCgkgICAgPG1ldGEgY2hhcnNldD0idXRmLTgiPg0KCSAgICA8bWV0YSBodHRwLWVxdWl2PSJYLVVBLUNvbXBhdGlibGUiIGNvbnRlbnQ9IklFPWVkZ2UiPg0KCSAgICA8bWV0YSBuYW1lPSJ2aWV3cG9ydCIgY29udGVudD0id2lkdGg9ZGV2aWNlLXdpZHRoLCBpbml0aWFsLXNjYWxlPTEiPg0KCSAgICA8dGl0bGU+PD89JHRoaXMtPnBhZ2VfbmFtZT8+PC90aXRsZT4NCg0KCSAgICA8IS0tIEJPT1RTVFJBUCBDU1MgLS0+DQoJICAgIDxsaW5rIHJlbD0ic3R5bGVzaGVldCIgaHJlZj0iaHR0cHM6Ly9tYXhjZG4uYm9vdHN0cmFwY2RuLmNvbS9ib290c3RyYXAvMy4zLjYvY3NzL2Jvb3RzdHJhcC5taW4uY3NzIiBpbnRlZ3JpdHk9InNoYTM4NC0xcThtVEpPQVN4OGoxQXUrYTVXRFZuUGkybGtGZnd3RUFhOGhERGRqWmxwTGVneGhqVk1FMWZnaldQR21renM3IiBjcm9zc29yaWdpbj0iYW5vbnltb3VzIj4NCgkgICAgPGxpbmsgcmVsPSJzdHlsZXNoZWV0IiBocmVmPSJodHRwczovL21heGNkbi5ib290c3RyYXBjZG4uY29tL2Jvb3RzdHJhcC8zLjMuNi9jc3MvYm9vdHN0cmFwLXRoZW1lLm1pbi5jc3MiIGludGVncml0eT0ic2hhMzg0LWZMVzJOMDFsTXFqYWtCa3gzbC9NOUVhaHV3cFNmZU52VjYzSjVlem4zdVp6YXBUMHU3RVlzWE1qUVYrMEVuNXIiIGNyb3Nzb3JpZ2luPSJhbm9ueW1vdXMiPg0KCSAgIAkNCgkgICAJPCEtLSBKUVVFUlkgLS0+DQoJICAgCTxzY3JpcHQgc3JjPSJodHRwczovL2FqYXguZ29vZ2xlYXBpcy5jb20vYWpheC9saWJzL2pxdWVyeS8xLjExLjMvanF1ZXJ5Lm1pbi5qcyI+PC9zY3JpcHQ+DQoJICAgIA0KCSAgICA8IS0tIEJPT1RTVFJBUCBKUyAtLT4NCgkgICAgPHNjcmlwdCBzcmM9Imh0dHBzOi8vbWF4Y2RuLmJvb3RzdHJhcGNkbi5jb20vYm9vdHN0cmFwLzMuMy42L2pzL2Jvb3RzdHJhcC5taW4uanMiIGludGVncml0eT0ic2hhMzg0LTBtU2JKREVIaWFsZm11QkJRUDZBNFFycHJxNU9WZlczN1BSUjNqNUVMcXhzczF5VnFPdG5lcG5IVlA5YUo3eFMiIGNyb3Nzb3JpZ2luPSJhbm9ueW1vdXMiPjwvc2NyaXB0Pg0KDQoJICAgIDwhLS0gSFRNTDUgc2hpbSBhbmQgUmVzcG9uZC5qcyBmb3IgSUU4IHN1cHBvcnQgb2YgSFRNTDUgZWxlbWVudHMgYW5kIG1lZGlhIHF1ZXJpZXMgLS0+DQoJICAgIDwhLS0gV0FSTklORzogUmVzcG9uZC5qcyBkb2Vzbid0IHdvcmsgaWYgeW91IHZpZXcgdGhlIHBhZ2UgdmlhIGZpbGU6Ly8gLS0+DQoJICAgIDwhLS1baWYgbHQgSUUgOV0+DQoJICAgICAgPHNjcmlwdCBzcmM9Imh0dHBzOi8vb3NzLm1heGNkbi5jb20vaHRtbDVzaGl2LzMuNy4yL2h0bWw1c2hpdi5taW4uanMiPjwvc2NyaXB0Pg0KCSAgICAgIDxzY3JpcHQgc3JjPSJodHRwczovL29zcy5tYXhjZG4uY29tL3Jlc3BvbmQvMS40LjIvcmVzcG9uZC5taW4uanMiPjwvc2NyaXB0Pg0KCSAgICA8IVtlbmRpZl0tLT4NCiAgCTwvaGVhZD4NCiAgCTxib2R5Pg==',				
+					VIEW_PATH.'footer.php'					=> 'CTwvYm9keT4NCjwvaHRtbD4=',
+					VIEW_PATH.'System/404.php'				=> 'RXJyb3I6IDQwNC4gVGhlIGZpbGUgeW91IGFyZSBsb29raW5nIGZvciB3YXMgbm90IGZvdW5kLg==',
+					VIEW_PATH.'css/style.css'				=> 'IA==',
+					VIEW_PATH.'js/script.js'				=> 'IA==',
+				),
+				
+				//ROOT FILES
+				'root'			=> array(
+					APP_PATH.'.htaccess'					=> 'UmV3cml0ZUVuZ2luZSBPbg0KDQpSZXdyaXRlQmFzZSAvDQoNClJld3JpdGVDb25kICV7UkVRVUVTVF9GSUxFTkFNRX0gIS1mDQpSZXdyaXRlQ29uZCAle1JFUVVFU1RfRklMRU5BTUV9ICEtZA0KDQpSZXdyaXRlUnVsZSBeKC4qKSQgaW5kZXgucGhwLyQxIFtMXSA=',
+					APP_PATH.'index.php'					=> 'PD9waHANCgkNCgkvL0xPQUQgelNwYXJrDQoJcmVxdWlyZV9vbmNlICdzeXN0ZW0velNwYXJrLnBocCc7DQoNCgkvL1NUQVJUIHpTcGFyayBBTkQgVEVMTCBJVCBUTyBST1VURSBUSEUgUkVRVUVTVFMNCgluZXcgelNwYXJrKHRydWUpOw==',
+				),				
+			);
+
+
+			//CYCLE THE FILE TYPES			
+			foreach($files as $type => $file_types){	
+
+				//CYCLE THE FILES FOR THIS TYPE
+				foreach($file_types as $path => $file){
+
+					//DECODE THE FILES AND CREATE THEM
+					$this->create_file($path, base64_decode($file));
+				}
+			}
+
+			//INSTALL PLUGIN FILES
+			$this->install_plugins();
+
+			//INSTALL LIBRARY FILES
+			$this->install_libs();
+		}
+
+		//PLUGIN DATA
+		private function plugins(){
+			return array(
+				'plugin_name' => 'base64_encoded_content',
+			);
+		}
+
+		//LIBRARY DATA
+		private function libs(){
+			return array(
+				'lib_name' => 'base64_encoded_content',
+			);
+		}
+
+		//CREATE A DIRECTORY RECURSIVELY IF NECESSARY
+		private function force_dir($dir){
+			if(!is_file($dir)){
+				mkdir($dir, 0777, true);
+			}
+		}
+
+		//INSTALL AN INDIVIDULA PLUGIN
+		private function install_plugin($data){
+			$name = $data['plugin_name'];
+			unset($data['plugin_name']);
+			foreach($data as $path => $content){
+				$content = base64_decode($content);
+				$path = PLUGIN_PATH.$name.$path;
+				$this->force_dir(dirname($path));
+				$this->create_file($path, $content);
+			}
+		}
+
+		//INSTALL ALL SELECTED PLUGINS
+		private function install_plugins(){
+			$this->force_dir(PLUGIN_PATH);
+			if($_POST['plugin'] && !empty($_POST['plugin'])){
+				$plugins = $this->plugins();
+				foreach($_POST['plugin'] as $plugin){
+					if(isset($plugins[$plugin])){
+						$plugin_data = unserialize(base64_decode($plugins[$plugin]));
+						$this->install_plugin($plugin_data);
+					}
+				}
+			}
+		}
+
+		//INSTALL SELECTED LIBRARIES
+		private function install_libs(){
+			$this->force_dir(LIB_PATH);
+			if($_POST['lib'] && !empty($_POST['lib'])){
+				$libraries = $this->libs();
+				foreach($_POST['lib'] as $library){
+					if(isset($libraries[$library])){
+						$lib_data = base64_decode($libraries[$library]);
+						$this->create_file(LIB_PATH.$library.'.php', $lib_data);
+					}
+				}
+			}
+		}		
+
+		//CREATE A FILE
+		private function create_file($filename, $content){
+			$this->force_dir(dirname($filename));
+			$handle = fopen($filename, "w+");
+			fwrite($handle, $content);
+			fclose($handle);
+		}
+
+
+		//INSTALLER TEMPLATE VIEW
 		private function installer_template_welcome($data = array()){
-			?>
+?>
 <!DOCTYPE html>
 <html lang=\"en\">
   	<head>
@@ -1507,161 +318,11 @@ class zSpark_Config extends zSpark{
 	  	</div>
   	</body>
 </html>
-			<?
-		}
-
-		//CREATE THE HTACCESS FILE: /.htaccess
-		private function htaccess(){
-
-
-			$this->create_file(APP_PATH.'.htaccess', "
-RewriteEngine On
-
-RewriteBase /
-
-RewriteCond %{REQUEST_FILENAME} !-f
-RewriteCond %{REQUEST_FILENAME} !-d
-
-RewriteRule ^(.*)$ index.php/$1 [L] ");
-			
-		}
-
-		private function login_controller(){
-			$this->create_file(CONTROLLER_PATH.'Login_Controller.php', "
-<?php
-	class Login_Controller extends zSpark_Controller {
-
-		public function __construct(){
-			//DO STUFF HERE WHEN THE CONTROLLER IS LOADED
-		}
-
-		public function index(){
-			//DO STUFF HERE WHEN THE DEFAULT VIEW IS LOADED
+<?			
 		}
 	}
-?>");			
-		}
 
-		private function login_template(){
-			
-			//CREATE THE LOGIN TEMPLATE FOLDER
-			mkdir(VIEW_PATH.'Login', 0777, true);
-			
-			$content = "<div class=\"container\">
-	<div class=\"page-header\">Please Login</div>
-	<form>
-		<div class=\"form-group\">
-	    	<label for=\"email\">Email address</label>
-	    	<input type=\"email\" class=\"form-control\" id=\"email\" name=\"email\" placeholder=\"Email\">
-	  	</div>
-		<div class=\"form-group\">
-			<label for=\"password\">Password</label>
-			<input type=\"password\" class=\"form-control\" id=\"password\" name=\"password\" placeholder=\"Password\">
-		</div>
-	  <button type=\"submit\" class=\"btn btn-default\">Submit</button>
-	</form>
-</div>
-";
-			//MAKE THE DEFAULT VIEW
-			$this->create_file(VIEW_PATH.'Login/index.php', $content);
-		}
-
-		private function home_controller(){
-
-			$this->create_file(CONTROLLER_PATH.'Home_Controller.php', "
-<?php
-	class Home_Controller extends zSpark_Controller {
-
-		public function __construct(){
-			//DO STUFF HERE WHEN THE CONTROLLER IS LOADED
-		}
-
-		public function index(){
-			//DO STUFF HERE WHEN THE DEFAULT VIEW IS LOADED
-		}
-	}
-?>");			
-		}
-
-		//DEFAULT HOME TEMPLATE: /view/Home/index.php
-		private function home_template(){
-
-			//CREATE THE HOME TEMPLATE FOLDER
-			mkdir(VIEW_PATH.'Home', 0777, true);
-			$content = "
-    	<h1>Welcome to zSpark</h1>
-";
-			//MAKE THE DEFAULT VIEW
-			$this->create_file(VIEW_PATH.'Home/index.php', $content);
-		}
-
-		//DEFAULT HEADER: /view/header.php
-		private function header(){
-			$content = "
-<!DOCTYPE html>
-<html lang=\"en\">
-  	<head>
-	    <meta charset=\"utf-8\">
-	    <meta http-equiv=\"X-UA-Compatible\" content=\"IE=edge\">
-	    <meta name=\"viewport\" content=\"width=device-width, initial-scale=1\">
-	    <title>".'<?=$this->page_name?>'."</title>
-
-	    <!-- BOOTSTRAP CSS -->
-	    <link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap.min.css\" integrity=\"sha384-1q8mTJOASx8j1Au+a5WDVnPi2lkFfwwEAa8hDDdjZlpLegxhjVME1fgjWPGmkzs7\" crossorigin=\"anonymous\">
-	    <link rel=\"stylesheet\" href=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/css/bootstrap-theme.min.css\" integrity=\"sha384-fLW2N01lMqjakBkx3l/M9EahuwpSfeNvV63J5ezn3uZzapT0u7EYsXMjQV+0En5r\" crossorigin=\"anonymous\">
-	   	
-	   	<!-- JQUERY -->
-	   	<script src=\"https://ajax.googleapis.com/ajax/libs/jquery/1.11.3/jquery.min.js\"></script>
-	    
-	    <!-- BOOTSTRAP JS -->
-	    <script src=\"https://maxcdn.bootstrapcdn.com/bootstrap/3.3.6/js/bootstrap.min.js\" integrity=\"sha384-0mSbJDEHialfmuBBQP6A4Qrprq5OVfW37PRR3j5ELqxss1yVqOtnepnHVP9aJ7xS\" crossorigin=\"anonymous\"></script>
-
-	    <!-- HTML5 shim and Respond.js for IE8 support of HTML5 elements and media queries -->
-	    <!-- WARNING: Respond.js doesn't work if you view the page via file:// -->
-	    <!--[if lt IE 9]>
-	      <script src=\"https://oss.maxcdn.com/html5shiv/3.7.2/html5shiv.min.js\"></script>
-	      <script src=\"https://oss.maxcdn.com/respond/1.4.2/respond.min.js\"></script>
-	    <![endif]-->
-  	</head>
-  	<body>";
-
-  			$this->create_file(VIEW_PATH.'header.php', $content);
-		}
-
-		//DEFAULT FOOTER: /view/footer.php
-		private function footer(){
-			$content = "
-	</body>
-</html>";
-			$this->create_file(VIEW_PATH.'footer.php', $content);
-		}
-
-		private function system_template(){
-			mkdir(VIEW_PATH.'System', 0777, true);
-			$this->create_file(VIEW_PATH.'System/404.php', 'Error: 404. The file you are looking for was not found.');
-		}
-
-		private function css(){
-			mkdir(VIEW_PATH.'css', 0777, true);
-			$this->create_file(VIEW_PATH.'css/style.css', '');
-		}
-
-		private function javascript(){
-			mkdir(VIEW_PATH.'js', 0777, true);
-			$this->create_file(VIEW_PATH.'js/script.js', '');
-		}
-
-		//CREATE A FILE
-		private function create_file($filename, $content){
-			$handle = fopen($filename, "w+");
-			fwrite($handle, $content);
-			fclose($handle);
-		}
-	}
-	
-	
-
-	//RUN THE APP
+	//RUN THE INSTALLER
 	new zSpark_Installer();
 
 	
