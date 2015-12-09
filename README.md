@@ -12,6 +12,8 @@ zSpark is a framework that has been under development for several years. It has 
 * Custom Database class
 * Automatic URL routing
 * Automatic ORM relationships
+* Support for Plugins
+* Support for Libraries
 * Deploys with Bootstrap and jQuery
 
 ## Installation
@@ -454,9 +456,62 @@ The code would look like this
 		public function get_friends_by_state($state){
 			$friends = $this->location("friend_city = '{$state}'");
 		}
-		
-	
 	}
-	
-	
+```
+
+##Plugins
+
+zSpark plugins are php classes that can take advantage of the zSpark framework. Sometimes you need to be able to write a class that isnt a model or a controller and that is what plugins are for.
+
+Lets say that you want to write a way to interact with an email service like mail chimp. You can write the code you need in a controller but the controller may become cluttered with a lot of methods that are unecessary for that controller and only pertain to mail chimp. Thats where yoou would write a plugin. 
+
+#### Creating a plugin
+
+If we are going to write a mailchimp plugin we first need to create a file in the /plugin folder named Mailchimp_Plugin.php  
+
+The plugin code should start out as something like this
+
+```
+<?php
+	class Mailchimp_Plugin extends zSpark{
+		
+		public function __construct(){
+			//do code here
+		}
+		
+		public function add_user_to_list($user){
+			//do code here
+		}
+	}
+
+```
+
+Now we can access this plugin and use its method "add_user_to_list" by using 
+
+```
+	$user = $this->load_model('User')->orm_load(1);
+	$this->load_plugin('Mailchimp')->add_user_to_list($user);
+```
+
+## Libraries
+
+A library is a lot lot a plugin extept it does not utilize the zSpark framework. Sometimes we need to use a 3rd party library and get it to work in our framework without adjusting the code. 
+
+In this example we will use a curl wrapper library. 
+
+First we need to make sure that CurlWrapper.php is stored in the /lib folder
+
+If the library has a class named CurlWrapper, the $this->load_lib('CurlWrapper'); will return the class.
+If the CurlWrapper class has a method called "post" we can use it like this.
+
+```
+$curl = $this->load_lib('CurlWrapper');
+$curl->post($data);
+```
+
+But sometimes libraries dont have classes or you dont want to autoload them. In that case load_lib works just like an include.
+
+```
+$this->load_lib('CurlWrapper);
+$result = use_curl_wrapper_function($data);
 ```
