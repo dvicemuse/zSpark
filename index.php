@@ -1,17 +1,6 @@
-<?php
+<?php	
 
-	function pr($data){
-		echo '<pre>';
-		if(!$data){
-			var_dump($data);
-		}
-		else{
-			print_r($data);
-		}
-		echo '</pre>';
-	}
-
-	//INSTALL THE FRAMEWORK
+	//zSpark Installer CLASSS
 	class zSpark_Installer{
 
 		//INITIALIZE INSTALLER
@@ -56,11 +45,8 @@
 			}
 			else{	
 
-
 				//COMPILE THE CONFIG FOLDER
 				$this->build_config_file();
-
-
 
 				//CREATE THE FILES
 				$this->build_files();
@@ -141,7 +127,6 @@
 					APP_PATH.'index.php'					=> 'PD9waHANCgkNCgkvL0xPQUQgelNwYXJrDQoJcmVxdWlyZV9vbmNlICdzeXN0ZW0velNwYXJrLnBocCc7DQoNCgkvL1NUQVJUIHpTcGFyayBBTkQgVEVMTCBJVCBUTyBST1VURSBUSEUgUkVRVUVTVFMNCgluZXcgelNwYXJrKHRydWUpOw==',
 				),				
 			);
-
 
 			//CYCLE THE FILE TYPES			
 			foreach($files as $type => $file_types){	
