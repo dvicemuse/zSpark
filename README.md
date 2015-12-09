@@ -148,8 +148,7 @@ OR
 	$this->disable_headers('settings');
 ```
 
-
-** Full Example **
+**Full Example**
 
 ```
 <?php
