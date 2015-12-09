@@ -38,22 +38,30 @@ Any parts after that are variables that can be passed to the controller or view
 
 ---
 
-Lets see some examples. 
+**Lets see some examples.** 
 
-***If your visiting the website http://www.example.com/***
-- /controller/Home_Controller.php is loaded
-- /view/Home/index.php is loaded
+*If your visiting the website http://www.example.com/*
 
-***If the URL is http://www.example.com/Dashboard***
-- Try to load /controller/Dashboard_Controller.php
-- Try to load /view/Dashboard/index.php
-- If neither are found load /view/System/404.php
- 
-***If the URL is http://www.example.com/Dashboard/profile***
+```
+ - /controller/Home_Controller.php is loaded
+ - /view/Home/index.php is loaded
+```
+
+*If the URL is http://www.example.com/Dashboard*
+
+``` 
+ - Try to load /controller/Dashboard_Controller.php
+ - Try to load /view/Dashboard/index.php
+ - If neither are found load /view/System/404.php
+```
+
+*If the URL is http://www.example.com/Dashboard/profile*
+
+```
 - Try to load /controller/Dashboard/Dashboard_Controller.php
 - Try to find a method called "profile" in Dashboard_Controller.php and run it.
 - Try to load /view/Dashboard/profile.php
 - If /controller/Dashboard/Dashboard_Controller.php AND /view/Dashboard/profile.php where not found zSpark loads the 404 template.
- 
+```
 
 
